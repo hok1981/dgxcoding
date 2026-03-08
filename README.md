@@ -39,11 +39,11 @@ hostname -I | awk '{print $1}'
 On your client machine:
 ```bash
 # PowerShell
-$env:ANTHROPIC_BASE_URL = "http://YOUR_DGX_IP:8000/v1"
+$env:ANTHROPIC_BASE_URL = "http://YOUR_DGX_IP:8002/v1"
 $env:ANTHROPIC_AUTH_TOKEN = "dummy"
 
 # Bash
-export ANTHROPIC_BASE_URL=http://YOUR_DGX_IP:8000/v1
+export ANTHROPIC_BASE_URL=http://YOUR_DGX_IP:8002/v1
 export ANTHROPIC_AUTH_TOKEN=dummy
 
 # Use with Claude Code
@@ -54,8 +54,8 @@ claude --model qwen3.5-35b
 
 | Model | Command | Memory | Performance | Port |
 |-------|---------|--------|-------------|------|
-| **Qwen3.5-35B-A3B** | `docker-compose up -d qwen35-35b` | ~90GB | 30-50 tok/s | 8000 |
-| **Qwen3.5-122B-A10B** | `docker-compose --profile large up -d qwen35-122b` | ~120GB | ~15 tok/s | 8002 |
+| **Qwen3.5-35B-A3B** | `docker-compose up -d qwen35-35b` | ~90GB | 30-50 tok/s | 8002 |
+| **Qwen3.5-122B-A10B** | `docker-compose --profile large up -d qwen35-122b` | ~120GB | ~15 tok/s | 8003 |
 
 ## Architecture
 
@@ -63,7 +63,7 @@ claude --model qwen3.5-35b
 ┌─────────────────────┐         Network          ┌─────────────────────┐
 │  Client Machine     │◄──────────────────────►│  DGX Spark Server   │
 │                     │                          │                     │
-│  - Claude Code      │    HTTP API (8000)      │  - Qwen3.5 Model    │
+│  - Claude Code      │    HTTP API (8002)      │  - Qwen3.5 Model    │
 │  - Your IDE         │                          │  - vLLM Server      │
 │  - Development      │                          │  - 128GB Memory     │
 └─────────────────────┘                          └─────────────────────┘
