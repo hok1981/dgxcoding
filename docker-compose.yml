@@ -33,9 +33,6 @@ services:
       --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
       --enable-prefix-caching
-      --enable-metrics
-      --metrics-port 8001
-      --metrics-interval 1
     restart: unless-stopped
 
   qwen35-122b:
@@ -72,9 +69,6 @@ services:
       --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
       --enable-prefix-caching
-      --enable-metrics
-      --metrics-port 8001
-      --metrics-interval 1
     restart: unless-stopped
     profiles:
       - large
