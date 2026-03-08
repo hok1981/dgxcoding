@@ -1,6 +1,6 @@
 services:
   qwen35-35b:
-    image: ghcr.io/ridanuae/dgx-spark-sglang-qwen35:latest
+    image: lmsysorg/sglang:spark
     container_name: qwen35-35b
     runtime: nvidia
     environment:
@@ -23,6 +23,7 @@ services:
               count: all
               capabilities: [gpu]
     command: >
+      bash -c "pip install --break-system-packages 'transformers<5.0' &&
       python3 -m sglang.launch_server
       --model-path Qwen/Qwen3.5-35B-A3B
       --host 0.0.0.0
@@ -33,7 +34,7 @@ services:
       --attention-backend triton
       --context-length 131072
       --tp-size 1
-      --mem-fraction-static 0.7
+      --mem-fraction-static 0.7"
     restart: unless-stopped
 
   qwen35-122b:
