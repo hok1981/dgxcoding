@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Model switching utility for Qwen3.5 and other models
 # Handles stopping current model and starting requested one
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Colors for output
@@ -13,11 +13,14 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Available models
-declare -A MODELS=(
-    ["35b"]="qwen35-35b"
-    ["122b"]="qwen35-122b"
-)
+# Available models (using case statement instead of associative array for sh compatibility)
+get_service_name() {
+    case "$1" in
+        35b) echo "qwen35-35b" ;;
+        122b) echo "qwen35-122b" ;;
+        *) echo "" ;;
+    esac
+}
 
 show_usage() {
     echo "Usage: $0 <model>"
@@ -43,7 +46,7 @@ stop_all_models() {
 
 start_model() {
     local model_key=$1
-    local service_name=${MODELS[$model_key]}
+    local service_name=$(get_service_name "$model_key")
     
     if [ -z "$service_name" ]; then
         echo -e "${RED}Error: Unknown model '$model_key'${NC}"
@@ -91,7 +94,7 @@ main() {
     esac
     
     # Validate model exists
-    if [ -z "${MODELS[$model]}" ]; then
+    if [ -z "$(get_service_name "$model")" ]; then
         echo -e "${RED}Error: Unknown model '$model'${NC}"
         show_usage
         exit 1
