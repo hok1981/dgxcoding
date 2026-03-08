@@ -1,49 +1,22 @@
 version: '3.8'
 
 services:
-  qwen35-122b:
-    build: .
-    container_name: qwen35-122b
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - CUDA_VISIBLE_DEVICES=0
-    ports:
-      - "0.0.0.0:8001:8001"
-    volumes:
-      - ./models:/app/models
-      - huggingface_cache:/root/.cache/huggingface
-    shm_size: '32gb'
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    command: >
-      python3 -m sglang.launch_server
-      --model-path Qwen/Qwen3.5-122B-A10B
-      --port 8001
-      --host 0.0.0.0
-      --tp-size 1
-      --context-length 262144
-      --reasoning-parser qwen3
-      --trust-remote-code
-
   qwen35-35b:
-    build: .
+    image: lmsysorg/sglang:spark
     container_name: qwen35-35b
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - CUDA_VISIBLE_DEVICES=0
+      - HF_TOKEN=${HF_TOKEN}
     ports:
-      - "0.0.0.0:8002:8001"
+      - "0.0.0.0:8001:8001"
     volumes:
-      - ./models:/app/models
-      - huggingface_cache:/root/.cache/huggingface
-    shm_size: '16gb'
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    shm_size: '32gb'
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
     deploy:
       resources:
         reservations:
@@ -54,14 +27,53 @@ services:
     command: >
       python3 -m sglang.launch_server
       --model-path Qwen/Qwen3.5-35B-A3B
-      --port 8001
       --host 0.0.0.0
-      --tp-size 1
-      --context-length 262144
-      --reasoning-parser qwen3
+      --port 8001
       --trust-remote-code
-    profiles:
-      - alternative
+      --reasoning-parser qwen3
+      --tool-call-parser qwen3_coder
+      --attention-backend triton
+      --context-length 131072
+      --tp-size 1
+      --mem-fraction-static 0.7
+    restart: unless-stopped
 
-volumes:
-  huggingface_cache:
+  qwen35-122b:
+    image: lmsysorg/sglang:spark
+    container_name: qwen35-122b
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_TOKEN=${HF_TOKEN}
+    ports:
+      - "0.0.0.0:8002:8001"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    shm_size: '32gb'
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      python3 -m sglang.launch_server
+      --model-path Qwen/Qwen3.5-122B-A10B
+      --host 0.0.0.0
+      --port 8001
+      --trust-remote-code
+      --reasoning-parser qwen3
+      --tool-call-parser qwen3_coder
+      --attention-backend triton
+      --context-length 65536
+      --tp-size 1
+      --mem-fraction-static 0.65
+      --quantization modelopt_fp4
+    restart: unless-stopped
+    profiles:
+      - large
