@@ -23,7 +23,7 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      bash -c "pip install --upgrade transformers accelerate &&
+      bash -c "pip install --upgrade --break-system-packages transformers accelerate &&
       python3 -m sglang.launch_server
       --model-path Qwen/Qwen3.5-35B-A3B
       --host 0.0.0.0
@@ -61,7 +61,7 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      bash -c "pip install --upgrade transformers accelerate &&
+      bash -c "pip install --upgrade --break-system-packages transformers accelerate &&
       python3 -m sglang.launch_server
       --model-path Qwen/Qwen3.5-122B-A10B
       --host 0.0.0.0
