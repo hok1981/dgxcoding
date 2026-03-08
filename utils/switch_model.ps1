@@ -27,14 +27,14 @@ function Show-Usage {
     Write-Host ""
     Write-Host "Current status:" -ForegroundColor Cyan
     Push-Location $ProjectDir
-    docker-compose ps
+    docker compose ps
     Pop-Location
 }
 
 function Stop-AllModels {
     Write-Host "Stopping all running models..." -ForegroundColor Yellow
     Push-Location $ProjectDir
-    docker-compose down
+    docker compose down
     Pop-Location
     Write-Host "✓ All models stopped" -ForegroundColor Green
 }
@@ -55,9 +55,9 @@ function Start-Model {
     
     # Start the model (with profile if needed)
     if ($ModelKey -eq "122b") {
-        docker-compose --profile large up -d $ServiceName
+        docker compose --profile large up -d $ServiceName
     } else {
-        docker-compose up -d $ServiceName
+        docker compose up -d $ServiceName
     }
     
     Pop-Location

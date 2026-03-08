@@ -14,9 +14,9 @@ else
     echo "✗ No Qwen3.5 container is running"
     echo ""
     echo "Start a container with:"
-    echo "  docker-compose up -d qwen35-35b"
+    echo "  docker compose up -d qwen35-35b"
     echo "  or"
-    echo "  docker-compose up -d qwen35-122b"
+    echo "  docker compose up -d qwen35-122b"
     exit 1
 fi
 

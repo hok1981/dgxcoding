@@ -47,20 +47,20 @@ If you prefer manual control:
 
 ```bash
 # Stop current model
-docker-compose down
+docker compose down
 
 # Start 35B
-docker-compose up -d qwen35-35b
+docker compose up -d qwen35-35b
 
 # Start 122B (requires profile)
-docker-compose --profile large up -d qwen35-122b
+docker compose --profile large up -d qwen35-122b
 ```
 
 ## Adding New Models
 
 To add a new model to the switching script:
 
-1. **Add service to `docker-compose.yml`:**
+1. **Add service to `docker compose.yml`:**
 
 ```yaml
 services:
@@ -144,14 +144,14 @@ python utils/monitor_metrics.py
 - Ensure previous model is stopped: `docker ps`
 
 ### Out of memory
-- Stop other containers: `docker-compose down`
-- Reduce `--gpu-memory-utilization` in docker-compose.yml
+- Stop other containers: `docker compose down`
+- Reduce `--gpu-memory-utilization` in docker compose.yml
 - Use smaller model or shorter context
 
 ### Port conflicts
 - Each model needs a unique external port
 - Check used ports: `ss -tlnp | grep 800`
-- Update `ports` in docker-compose.yml
+- Update `ports` in docker compose.yml
 
 ## Performance Tips
 
@@ -206,5 +206,5 @@ docker logs -f qwen35-35b
 docker logs -f qwen35-122b
 
 # Stop everything
-docker-compose down
+docker compose down
 ```

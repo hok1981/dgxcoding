@@ -34,13 +34,13 @@ show_usage() {
     echo "  $0 122b   # Switch to 122B model"
     echo ""
     echo "Current status:"
-    docker-compose -f "$PROJECT_DIR/docker-compose.yml" ps
+    docker compose -f "$PROJECT_DIR/docker-compose.yml" ps
 }
 
 stop_all_models() {
     echo -e "${YELLOW}Stopping all running models...${NC}"
     cd "$PROJECT_DIR"
-    docker-compose down
+    docker compose down
     echo -e "${GREEN}✓ All models stopped${NC}"
 }
 
@@ -59,9 +59,9 @@ start_model() {
     
     # Start the model (with profile if needed)
     if [ "$model_key" == "122b" ]; then
-        docker-compose --profile large up -d "$service_name"
+        docker compose --profile large up -d "$service_name"
     else
-        docker-compose up -d "$service_name"
+        docker compose up -d "$service_name"
     fi
     
     echo -e "${GREEN}✓ $service_name started${NC}"

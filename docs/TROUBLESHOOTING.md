@@ -145,7 +145,7 @@ docker logs qwen35-35b --tail 50
 **Solution:**
 ```bash
 # Restart container
-docker-compose restart qwen35-35b
+docker compose restart qwen35-35b
 ```
 
 ### Connection Refused
@@ -277,7 +277,7 @@ docker logs -f qwen35-35b
 
 **Verify parser is enabled:**
 ```bash
-# In docker-compose.yml
+# In docker compose.yml
 --tool-call-parser qwen3_coder
 ```
 
@@ -303,7 +303,7 @@ docker logs -f qwen35-35b
 
 **Verify parser is enabled:**
 ```bash
-# In docker-compose.yml
+# In docker compose.yml
 --reasoning-parser qwen3
 ```
 

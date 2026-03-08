@@ -20,7 +20,7 @@ Connect Claude Code running on your client machine to Qwen3.5 running on DGX Spa
 
 ```bash
 # Start Qwen3.5-35B
-docker-compose up -d qwen35-35b
+docker compose up -d qwen35-35b
 
 # Verify it's running
 docker ps
@@ -272,7 +272,7 @@ docker stats qwen35-35b
 
 **Check if port is exposed:**
 ```bash
-# In docker-compose.yml, verify:
+# In docker compose.yml, verify:
 ports:
   - "0.0.0.0:8001:8001"  # Correct
   # NOT "127.0.0.1:8001:8001"
@@ -290,7 +290,7 @@ The server can handle multiple concurrent clients:
 ### Server Side (DGX Spark)
 ```bash
 # Start
-docker-compose up -d qwen35-35b
+docker compose up -d qwen35-35b
 
 # Get IP
 hostname -I | awk '{print $1}'
