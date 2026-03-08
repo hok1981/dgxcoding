@@ -201,6 +201,27 @@ def main():
     print("Qwen3.5 Setup for NVIDIA DGX Spark (128GB Unified Memory)")
     print("=" * 60)
     
+    print("\nSetup Options:")
+    print("1. Docker (Recommended - no dependency issues)")
+    print("2. Native Python (requires manual dependency setup)")
+    
+    setup_type = input("\nChoose setup type (1/2): ").strip()
+    
+    if setup_type == "1":
+        print("\n✓ Docker setup selected")
+        print("\nDocker setup is ready to use!")
+        print("\nNext steps:")
+        print("1. Build and start the container:")
+        print("   docker-compose up -d qwen35-35b")
+        print("\n2. View logs:")
+        print("   docker-compose logs -f qwen35-35b")
+        print("\n3. Configure firewall for remote access:")
+        print("   sudo ufw allow 8001/tcp")
+        print("\n4. Test connection:")
+        print("   curl http://localhost:8001/v1/models")
+        print("\nSee DOCKER_GUIDE.md for more details.")
+        return
+    
     print("\nAvailable models:")
     for key, info in MODELS.items():
         star = " ⭐" if info["recommended"] else ""
@@ -219,7 +240,21 @@ def main():
     print(f"\nSetting up Qwen3.5-{choice.upper()}...")
     
     # Check dependencies
-    check_dependencies()
+    print("\nNote: If you see 'externally-managed-environment' errors,")
+    print("you should use Docker setup instead (option 1).")
+    skip_deps = input("\nSkip dependency check? (y/n): ").lower()
+    
+    if skip_deps != 'y':
+        try:
+            check_dependencies()
+        except subprocess.CalledProcessError:
+            print("\n⚠️  Dependency installation failed.")
+            print("\nRecommendations:")
+            print("1. Use Docker setup (restart script and choose option 1)")
+            print("2. Or install dependencies manually:")
+            print("   pip install --user torch transformers huggingface_hub")
+            print("   pip install --user 'sglang[all]'")
+            return
     
     # Choose serving framework
     print("\nAvailable serving frameworks:")
