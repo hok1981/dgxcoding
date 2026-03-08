@@ -99,13 +99,12 @@ def display_metrics(metrics):
 
 def monitor_server(server_url, interval=2):
     """Main monitoring loop"""
-    metrics_url = f"{server_url}/metrics"
-    print(f"Monitoring {metrics_url}")
+    print(f"Monitoring {server_url}/metrics")
     print("Press Ctrl+C to exit\n")
 
     try:
         while True:
-            metrics_text = fetch_metrics(metrics_url)
+            metrics_text = fetch_metrics(server_url)
             if metrics_text:
                 metrics = parse_metrics(metrics_text)
                 display_metrics(metrics)
@@ -114,24 +113,29 @@ def monitor_server(server_url, interval=2):
         print("\n\nMonitoring stopped.")
 
 def main():
+    # Default to DGX Spark server
+    default_url = "http://192.168.68.40:8002"
+    
     if len(sys.argv) < 2:
-        print("Usage: python monitor_metrics.py <server_url> [interval]")
+        server_url = default_url
+        interval = 2.0
+        print(f"Using default server: {server_url}")
+        print("Usage: python monitor_metrics.py [server_url] [interval]")
         print()
-        print("Examples:")
-        print("  python monitor_metrics.py http://localhost:8002")
-        print("  python monitor_metrics.py http://192.168.1.100:8002 1")
-        sys.exit(1)
-
-    server_url = sys.argv[1]
-    interval = float(sys.argv[2]) if len(sys.argv) > 2 else 2.0
-
-    # Ensure URL has proper format
-    if not server_url.endswith('/'):
-        server_url += '/'
+    else:
+        server_url = sys.argv[1]
+        interval = float(sys.argv[2]) if len(sys.argv) > 2 else 2.0
+    
+    # Ensure URL has http:// prefix
+    if not server_url.startswith('http://') and not server_url.startswith('https://'):
+        server_url = 'http://' + server_url
+    
+    # Remove trailing slash for consistent handling
+    server_url = server_url.rstrip('/')
 
     # Test connection first
     try:
-        response = requests.get(f"{server_url}health", timeout=5)
+        response = requests.get(f"{server_url}/health", timeout=5)
         if response.status_code != 200:
             print(f"Warning: Health check returned {response.status_code}")
     except Exception as e:
