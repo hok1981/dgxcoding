@@ -2,39 +2,41 @@
 
 ## Project Overview
 
-This project runs Qwen3.5 models on NVIDIA DGX Spark (Grace Blackwell ARM64) using SGLang in Docker, with remote access for Claude Code.
+This project runs Qwen3.5 models on NVIDIA DGX Spark (Grace Blackwell ARM64) using vLLM in Docker, with remote access for Claude Code.
 
 ## Architecture
 
 - **Hardware**: DGX Spark (ARM64, 128GB unified memory, Blackwell GB10 GPU)
-- **Container**: `lmsysorg/sglang:spark` (official ARM64 image)
+- **Container**: `vllm/vllm-openai:cu130-nightly` (ARM64 with Qwen3.5 support)
 - **Models**: Qwen3.5-35B-A3B (primary), Qwen3.5-122B-A10B (optional)
-- **API**: Anthropic-compatible (Claude Code integration)
+- **API**: OpenAI-compatible (Claude Code integration)
 
 ## Critical Constraints
 
 ### 1. Architecture is ARM64
 - DGX Spark uses Grace CPU (ARM Cortex-X925/A725)
 - **Never** use x86_64 Docker images
-- **Always** use `lmsysorg/sglang:spark` or ARM64-compatible images
+- **Always** use `vllm/vllm-openai:cu130-nightly` or ARM64-compatible images
 
-### 2. Required SGLang Flags
+### 2. Required vLLM Flags
 ```bash
---attention-backend triton        # Required for GB10 GPU
---trust-remote-code              # Required for Qwen models
 --reasoning-parser qwen3         # Enable reasoning mode
 --tool-call-parser qwen3_coder   # Enable tool calling
+--enable-auto-tool-choice        # Auto tool selection
+--enable-prefix-caching          # Performance optimization
 ```
 
 ### 3. Memory Management
 - Total: 128GB unified (CPU + GPU shared)
-- 35B model: ~118GB used (safe)
-- 122B model: Requires FP4 quantization, experimental
+- 35B model: ~90GB used with vLLM (efficient)
+- 122B model: ~120GB (experimental)
+- Use `--gpu-memory-utilization 0.80` for stability
 
 ### 4. Performance Expectations
-- 35B-A3B: ~30 tok/s (BF16) - this is the ceiling
+- 35B-A3B: 30-50 tok/s (depends on context length)
+- First run: ~15 minutes (model download + CUDA graph compilation)
+- Subsequent runs: 1-2 minutes
 - Memory bandwidth limited: ~273 GB/s LPDDR5X
-- Don't expect faster speeds without quantization
 
 ## File Structure
 
@@ -56,10 +58,11 @@ CodingDGX/
 ## Code Style
 
 ### Docker Compose
-- Use `lmsysorg/sglang:spark` image
-- Include all required flags
-- Set `shm_size: '32gb'` and `ipc: host`
+- Use `vllm/vllm-openai:cu130-nightly` image
+- Model name as first argument in command
+- Set `shm_size: '64gb'` and `ipc: host`
 - Bind to `0.0.0.0` for remote access
+- Port 8000 (vLLM default)
 
 ### Documentation
 - Keep docs concise and practical
@@ -75,8 +78,8 @@ CodingDGX/
 
 ## What NOT to Do
 
-1. **Don't** create custom Dockerfiles - use official image
-2. **Don't** include vLLM - SGLang only
+1. **Don't** create custom Dockerfiles - use official vLLM image
+2. **Don't** use SGLang - vLLM has better Qwen3.5 support
 3. **Don't** use x86 CUDA images
 4. **Don't** create unnecessary abstraction layers
 5. **Don't** add Python virtual environment setup - Docker handles it
@@ -84,10 +87,10 @@ CodingDGX/
 
 ## What TO Do
 
-1. **Do** use official `lmsysorg/sglang:spark` image
-2. **Do** include all required SGLang flags
+1. **Do** use `vllm/vllm-openai:cu130-nightly` image
+2. **Do** include all required vLLM flags
 3. **Do** test on actual DGX Spark hardware
-4. **Do** document performance characteristics
+4. **Do** document first-run time (~15 minutes)
 5. **Do** keep configuration simple and clear
 6. **Do** provide troubleshooting guidance
 
@@ -108,7 +111,7 @@ CodingDGX/
 ### Server-Side
 ```bash
 ./utils/check_status.sh
-curl http://localhost:8001/v1/models
+curl http://localhost:8000/v1/models
 ```
 
 ### Client-Side
@@ -119,23 +122,23 @@ python utils/test_connection.py YOUR_DGX_IP
 ## Common Issues
 
 1. **Container crashes**: Check logs with `docker logs qwen35-35b`
-2. **Slow startup**: Model download takes 2-3 minutes first time
-3. **Out of memory**: Use 35B model, not 122B
-4. **Wrong architecture**: Ensure using `lmsysorg/sglang:spark`
+2. **Slow startup**: First run takes ~15 minutes (model download + CUDA compilation)
+3. **Out of memory**: Reduce `--gpu-memory-utilization` to 0.75 or 0.70
+4. **Model type not recognized**: Ensure using `vllm/vllm-openai:cu130-nightly` (has vLLM v0.16.0+)
 
 ## Version Information
 
-- **SGLang**: v0.5.9+ (use `:spark` tag)
+- **vLLM**: v0.16.0+ (in `:cu130-nightly` tag)
 - **Qwen3.5**: Latest (Feb/Mar 2026 releases)
-- **CUDA**: 13.0 (in spark image)
-- **PyTorch**: 2.10+ (in spark image)
+- **CUDA**: 13.1 (in vLLM nightly image)
+- **PyTorch**: 2.9+ (in vLLM nightly image)
 
 ## External Resources
 
-- [DGX Spark Playbooks](https://github.com/NVIDIA/dgx-spark-playbooks)
-- [SGLang Documentation](https://docs.sglang.io/)
+- [vLLM Documentation](https://docs.vllm.ai/)
 - [Qwen3.5 GitHub](https://github.com/QwenLM/Qwen3.5)
-- [SGLang Spark Support](https://github.com/sgl-project/sglang/issues/11658)
+- [Community Guide](https://github.com/adadrag/qwen3.5-dgx-spark)
+- [vLLM Docker Hub](https://hub.docker.com/r/vllm/vllm-openai)
 
 ## When Making Changes
 

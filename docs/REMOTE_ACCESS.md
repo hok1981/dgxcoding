@@ -8,8 +8,8 @@ Connect Claude Code running on your client machine to Qwen3.5 running on DGX Spa
 ┌─────────────────────┐         Network          ┌─────────────────────┐
 │  Client Machine     │◄──────────────────────►│  DGX Spark Server   │
 │                     │                          │                     │
-│  - Claude Code      │    HTTP API (8001)      │  - Qwen3.5 Model    │
-│  - Your IDE         │                          │  - SGLang Server    │
+│  - Claude Code      │    HTTP API (8000)      │  - Qwen3.5 Model    │
+│  - Your IDE         │                          │  - vLLM Server      │
 │  - Development      │                          │  - 128GB Memory     │
 └─────────────────────┘                          └─────────────────────┘
 ```
@@ -37,11 +37,11 @@ hostname -I | awk '{print $1}'
 ### 3. Configure Firewall
 
 ```bash
-# Allow port 8001 for remote connections
-sudo ufw allow 8001/tcp
+# Allow port 8000 for remote connections
+sudo ufw allow 8000/tcp
 
 # Or if using firewalld
-sudo firewall-cmd --permanent --add-port=8001/tcp
+sudo firewall-cmd --permanent --add-port=8000/tcp
 sudo firewall-cmd --reload
 ```
 
@@ -49,11 +49,11 @@ sudo firewall-cmd --reload
 
 ```bash
 # Check port is bound to all interfaces (0.0.0.0)
-sudo netstat -tlnp | grep 8001
-# Should show: 0.0.0.0:8001 (not 127.0.0.1:8001)
+sudo netstat -tlnp | grep 8000
+# Should show: 0.0.0.0:8000 (not 127.0.0.1:8000)
 
 # Test locally
-curl http://localhost:8001/v1/models
+curl http://localhost:8000/v1/models
 ```
 
 ## Client Setup (Your Development Machine)
@@ -72,13 +72,13 @@ python utils/test_connection.py 192.168.1.100
 
 **PowerShell:**
 ```powershell
-$env:ANTHROPIC_BASE_URL = "http://192.168.1.100:8001/v1"
+$env:ANTHROPIC_BASE_URL = "http://192.168.1.100:8000/v1"
 $env:ANTHROPIC_AUTH_TOKEN = "dummy"
 ```
 
 **Bash/WSL:**
 ```bash
-export ANTHROPIC_BASE_URL=http://192.168.1.100:8001/v1
+export ANTHROPIC_BASE_URL=http://192.168.1.100:8000/v1
 export ANTHROPIC_AUTH_TOKEN=dummy
 ```
 
@@ -88,7 +88,7 @@ export ANTHROPIC_AUTH_TOKEN=dummy
   "claudeCode.environmentVariables": [
     {
       "name": "ANTHROPIC_BASE_URL",
-      "value": "http://192.168.1.100:8001/v1"
+      "value": "http://192.168.1.100:8000/v1"
     },
     {
       "name": "ANTHROPIC_AUTH_TOKEN",
@@ -101,7 +101,7 @@ export ANTHROPIC_AUTH_TOKEN=dummy
 ### 3. Use Claude Code
 
 ```bash
-claude --model Qwen/Qwen3.5-35B-A3B
+claude --model qwen3.5-35b
 ```
 
 ## Network Configuration
@@ -161,10 +161,10 @@ For untrusted networks or internet access:
 **On client machine:**
 ```bash
 # Create SSH tunnel
-ssh -L 8001:localhost:8001 user@dgx-spark-ip
+ssh -L 8000:localhost:8000 user@dgx-spark-ip
 
 # In another terminal, use localhost
-export ANTHROPIC_BASE_URL=http://localhost:8001/v1
+export ANTHROPIC_BASE_URL=http://localhost:8000/v1
 ```
 
 **Benefits:**
@@ -185,7 +185,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
     
     location / {
-        proxy_pass http://localhost:8001;
+        proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_http_version 1.1;
@@ -226,21 +226,21 @@ curl http://localhost:8001/v1/models
 **3. Check firewall:**
 ```bash
 sudo ufw status
-# Should show: 8001/tcp ALLOW
+# Should show: 8000/tcp ALLOW
 ```
 
 **4. Test network connectivity:**
 ```bash
 # From client
 ping 192.168.1.100
-telnet 192.168.1.100 8001
+telnet 192.168.1.100 8000
 ```
 
 **5. Verify server bound to correct interface:**
 ```bash
 # On DGX Spark
-sudo netstat -tlnp | grep 8001
-# Should show: 0.0.0.0:8001 (not 127.0.0.1:8001)
+sudo netstat -tlnp | grep 8000
+# Should show: 0.0.0.0:8000 (not 127.0.0.1:8000)
 ```
 
 ### Slow Performance
@@ -296,7 +296,7 @@ docker-compose up -d qwen35-35b
 hostname -I | awk '{print $1}'
 
 # Open firewall
-sudo ufw allow 8001/tcp
+sudo ufw allow 8000/tcp
 
 # Check status
 docker logs -f qwen35-35b
@@ -305,12 +305,12 @@ docker logs -f qwen35-35b
 ### Client Side
 ```bash
 # Set environment (replace IP)
-export ANTHROPIC_BASE_URL=http://192.168.1.100:8001/v1
+export ANTHROPIC_BASE_URL=http://192.168.1.100:8000/v1
 export ANTHROPIC_AUTH_TOKEN=dummy
 
 # Test
-curl http://192.168.1.100:8001/v1/models
+curl http://192.168.1.100:8000/v1/models
 
 # Use
-claude --model Qwen/Qwen3.5-35B-A3B
+claude --model qwen3.5-35b
 ```

@@ -1,16 +1,16 @@
 services:
   qwen35-35b:
-    image: lmsysorg/sglang:spark
+    image: vllm/vllm-openai:cu130-nightly
     container_name: qwen35-35b
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
     ports:
-      - "0.0.0.0:8001:8001"
+      - "0.0.0.0:8000:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
-    shm_size: '32gb'
+    shm_size: '64gb'
     ipc: host
     ulimits:
       memlock: -1
@@ -23,32 +23,30 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      bash -c "pip install --break-system-packages 'transformers<5.0' &&
-      python3 -m sglang.launch_server
-      --model-path Qwen/Qwen3.5-35B-A3B
+      Qwen/Qwen3.5-35B-A3B
+      --served-model-name qwen3.5-35b
+      --port 8000
       --host 0.0.0.0
-      --port 8001
-      --trust-remote-code
+      --max-model-len 262144
+      --gpu-memory-utilization 0.80
       --reasoning-parser qwen3
+      --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
-      --attention-backend triton
-      --context-length 131072
-      --tp-size 1
-      --mem-fraction-static 0.7"
+      --enable-prefix-caching
     restart: unless-stopped
 
   qwen35-122b:
-    image: lmsysorg/sglang:spark
+    image: vllm/vllm-openai:cu130-nightly
     container_name: qwen35-122b
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
     ports:
-      - "0.0.0.0:8002:8001"
+      - "0.0.0.0:8002:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
-    shm_size: '32gb'
+    shm_size: '64gb'
     ipc: host
     ulimits:
       memlock: -1
@@ -61,19 +59,16 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      bash -c "pip install --upgrade --break-system-packages transformers accelerate &&
-      python3 -m sglang.launch_server
-      --model-path Qwen/Qwen3.5-122B-A10B
+      Qwen/Qwen3.5-122B-A10B
+      --served-model-name qwen3.5-122b
+      --port 8000
       --host 0.0.0.0
-      --port 8001
-      --trust-remote-code
+      --max-model-len 65536
+      --gpu-memory-utilization 0.75
       --reasoning-parser qwen3
+      --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
-      --attention-backend triton
-      --context-length 65536
-      --tp-size 1
-      --mem-fraction-static 0.65
-      --quantization modelopt_fp4"
+      --enable-prefix-caching
     restart: unless-stopped
     profiles:
       - large
