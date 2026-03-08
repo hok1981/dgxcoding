@@ -1,0 +1,8 @@
+models/
+*.pyc
+__pycache__/
+.venv/
+venv/
+*.log
+.env
+launch_scripts/*.log
