@@ -64,6 +64,7 @@ services:
       --port 8000
       --host 0.0.0.0
       --max-model-len 65536
+      --max-num-batched-tokens 4096
       --gpu-memory-utilization 0.75
       --reasoning-parser qwen3
       --enable-auto-tool-choice
