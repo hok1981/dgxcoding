@@ -72,13 +72,13 @@ python utils/test_connection.py 192.168.1.100
 
 **PowerShell:**
 ```powershell
-$env:ANTHROPIC_BASE_URL = "http://192.168.1.100:8000/v1"
+$env:ANTHROPIC_BASE_URL = "http://192.168.1.100:8002"
 $env:ANTHROPIC_AUTH_TOKEN = "dummy"
 ```
 
 **Bash/WSL:**
 ```bash
-export ANTHROPIC_BASE_URL=http://192.168.1.100:8000/v1
+export ANTHROPIC_BASE_URL=http://192.168.1.100:8002
 export ANTHROPIC_AUTH_TOKEN=dummy
 ```
 
@@ -88,7 +88,7 @@ export ANTHROPIC_AUTH_TOKEN=dummy
   "claudeCode.environmentVariables": [
     {
       "name": "ANTHROPIC_BASE_URL",
-      "value": "http://192.168.1.100:8000/v1"
+      "value": "http://192.168.1.100:8002"
     },
     {
       "name": "ANTHROPIC_AUTH_TOKEN",
@@ -161,10 +161,10 @@ For untrusted networks or internet access:
 **On client machine:**
 ```bash
 # Create SSH tunnel
-ssh -L 8000:localhost:8000 user@dgx-spark-ip
+ssh -L 8002:localhost:8002 user@dgx-spark-ip
 
 # In another terminal, use localhost
-export ANTHROPIC_BASE_URL=http://localhost:8000/v1
+export ANTHROPIC_BASE_URL=http://localhost:8002
 ```
 
 **Benefits:**
@@ -305,11 +305,11 @@ docker logs -f qwen35-35b
 ### Client Side
 ```bash
 # Set environment (replace IP)
-export ANTHROPIC_BASE_URL=http://192.168.1.100:8000/v1
+export ANTHROPIC_BASE_URL=http://192.168.1.100:8002
 export ANTHROPIC_AUTH_TOKEN=dummy
 
 # Test
-curl http://192.168.1.100:8000/v1/models
+curl http://192.168.1.100:8002/v1/models
 
 # Use
 claude --model qwen3.5-35b

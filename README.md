@@ -39,11 +39,11 @@ hostname -I | awk '{print $1}'
 On your client machine:
 ```bash
 # PowerShell
-$env:ANTHROPIC_BASE_URL = "http://YOUR_DGX_IP:8002/v1"
+$env:ANTHROPIC_BASE_URL = "http://YOUR_DGX_IP:8002"
 $env:ANTHROPIC_AUTH_TOKEN = "dummy"
 
 # Bash
-export ANTHROPIC_BASE_URL=http://YOUR_DGX_IP:8002/v1
+export ANTHROPIC_BASE_URL=http://YOUR_DGX_IP:8002
 export ANTHROPIC_AUTH_TOKEN=dummy
 
 # Use with Claude Code
