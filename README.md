@@ -55,7 +55,7 @@ claude --model qwen3.5-35b
 | Model | Command | Memory | Performance | Port |
 |-------|---------|--------|-------------|------|
 | **Qwen3.5-35B-A3B** | `docker compose up -d qwen35-35b` | ~90GB | 30-50 tok/s | 8002 |
-| **Qwen3.5-122B-A10B** | `docker-compose --profile large up -d qwen35-122b` | ~120GB | ~15 tok/s | 8003 |
+| **Qwen3.5-122B-A10B** | `docker compose --profile large up -d qwen35-122b` | ~120GB | ~15 tok/s | 8003 |
 
 ## Architecture
 

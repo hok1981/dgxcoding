@@ -13,6 +13,21 @@ This project runs Qwen3.5 models on NVIDIA DGX Spark (Grace Blackwell ARM64) usi
 
 ## Critical Constraints
 
+### 0. Docker Compose Command Format
+**CRITICAL**: Always use `docker compose` (with space) instead of `docker-compose` (with hyphen). The hyphenated version is deprecated and not available on this system.
+
+```bash
+# CORRECT
+docker compose up -d
+docker compose down
+docker compose ps
+
+# WRONG - DO NOT USE
+docker-compose up -d
+docker-compose down
+docker-compose ps
+```
+
 ### 1. Architecture is ARM64
 - DGX Spark uses Grace CPU (ARM Cortex-X925/A725)
 - **Never** use x86_64 Docker images
