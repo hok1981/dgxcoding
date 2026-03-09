@@ -107,3 +107,71 @@ services:
       --enable-prefix-caching
       --trust-remote-code
     restart: unless-stopped
+
+  kimi-k25:
+    image: vllm/vllm-openai:cu130-nightly
+    container_name: kimi-k25
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_TOKEN=${HF_TOKEN}
+    ports:
+      - "0.0.0.0:8005:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    shm_size: '64gb'
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      moonshotai/Kimi-K2.5
+      --served-model-name kimi-k25
+      --port 8000
+      --host 0.0.0.0
+      --max-model-len 32768
+      --gpu-memory-utilization 0.75
+      --enable-prefix-caching
+      --trust-remote-code
+    restart: unless-stopped
+
+  mimo-v2-flash:
+    image: vllm/vllm-openai:cu130-nightly
+    container_name: mimo-v2-flash
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_TOKEN=${HF_TOKEN}
+    ports:
+      - "0.0.0.0:8006:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    shm_size: '64gb'
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      XiaomiMiMo/MiMo-V2-Flash
+      --served-model-name mimo-v2-flash
+      --port 8000
+      --host 0.0.0.0
+      --max-model-len 32768
+      --gpu-memory-utilization 0.70
+      --enable-prefix-caching
+      --trust-remote-code
+    restart: unless-stopped
