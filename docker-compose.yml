@@ -170,8 +170,11 @@ services:
       --served-model-name mimo-v2-flash
       --port 8000
       --host 0.0.0.0
-      --max-model-len 32768
-      --gpu-memory-utilization 0.70
-      --enable-prefix-caching
+      --max-model-len 65536
+      --max-num-batched-tokens 32768
+      --gpu-memory-utilization 0.90
       --trust-remote-code
+      --generation-config vllm
+      --tool-call-parser qwen3_xml
+      --reasoning-parser qwen3
     restart: unless-stopped
