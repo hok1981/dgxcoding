@@ -1,22 +1,26 @@
 #!/bin/bash
-# Check if Qwen3.5 model is running and ready
+# Check if any LLM model is running and ready
 
-echo "Checking Qwen3.5 Model Status"
-echo "=============================="
+echo "Checking LLM Model Status"
+echo "=========================="
 
 # Check if container is running
 echo ""
 echo "[1/5] Checking if container is running..."
-if docker ps | grep -q qwen35; then
-    CONTAINER=$(docker ps | grep qwen35 | awk '{print $NF}')
+
+# Look for any of our model containers
+CONTAINER=$(docker ps --filter "name=qwen35-35b" --filter "name=qwen35-122b" --filter "name=deepseek-v32-speciale" --filter "name=kimi-k25" --filter "name=mimo-v2-flash" --format "{{.Names}}" | head -1)
+
+if [ -n "$CONTAINER" ]; then
     echo "✓ Container '$CONTAINER' is running"
 else
-    echo "✗ No Qwen3.5 container is running"
+    echo "✗ No model container is running"
     echo ""
     echo "Start a container with:"
-    echo "  docker compose up -d qwen35-35b"
-    echo "  or"
-    echo "  docker compose up -d qwen35-122b"
+    echo "  ./utils/switch_model.sh 35b       # Qwen3.5-35B"
+    echo "  ./utils/switch_model.sh deepseek  # DeepSeek-V3.2-Speciale"
+    echo "  ./utils/switch_model.sh kimi      # Kimi-K2.5"
+    echo "  ./utils/switch_model.sh mimo      # MiMo-V2-Flash"
     exit 1
 fi
 
@@ -41,26 +45,42 @@ fi
 # Check if port is listening
 echo ""
 echo "[3/5] Checking if API port is listening..."
-if netstat -tlnp 2>/dev/null | grep -q :8002 || ss -tlnp 2>/dev/null | grep -q :8002; then
-    echo "✓ Port 8002 is listening"
+
+# Get the external port for this container
+PORT=$(docker port $CONTAINER 8000 2>/dev/null | cut -d: -f2)
+
+if [ -n "$PORT" ]; then
+    if netstat -tlnp 2>/dev/null | grep -q :$PORT || ss -tlnp 2>/dev/null | grep -q :$PORT; then
+        echo "✓ Port $PORT is listening"
+    else
+        echo "✗ Port $PORT is not listening yet"
+        echo "Server may still be loading the model..."
+    fi
 else
-    echo "✗ Port 8002 is not listening yet"
-    echo "Server may still be loading the model..."
+    echo "⚠ Could not determine port mapping"
 fi
 
 # Test health endpoint
 echo ""
 echo "[4/5] Testing health endpoint..."
-if curl -s -f http://localhost:8002/health > /dev/null 2>&1; then
-    echo "✓ Health endpoint responding"
+if [ -n "$PORT" ]; then
+    if curl -s -f http://localhost:$PORT/health > /dev/null 2>&1; then
+        echo "✓ Health endpoint responding"
+    else
+        echo "⚠ Health endpoint not responding yet"
+    fi
 else
-    echo "⚠ Health endpoint not responding yet"
+    echo "⚠ Skipping health check (port unknown)"
 fi
 
 # Test models endpoint
 echo ""
 echo "[5/5] Testing models API endpoint..."
-MODELS_RESPONSE=$(curl -s http://localhost:8002/v1/models 2>/dev/null)
+if [ -n "$PORT" ]; then
+    MODELS_RESPONSE=$(curl -s http://localhost:$PORT/v1/models 2>/dev/null)
+else
+    MODELS_RESPONSE=""
+fi
 if [ ! -z "$MODELS_RESPONSE" ]; then
     echo "✓ Models API is responding"
     echo ""
@@ -82,18 +102,26 @@ echo "✓ Model is UP and READY!"
 echo "=============================="
 echo ""
 SERVER_IP=$(hostname -I | awk '{print $1}')
-echo "Server IP: $SERVER_IP"
-echo ""
-echo "Test from this machine:"
-echo "  curl http://localhost:8002/v1/models"
-echo ""
-echo "Test from client machine:"
-echo "  curl http://$SERVER_IP:8002/v1/models"
-echo ""
-echo "Configure Claude Code on client:"
-echo "  export ANTHROPIC_BASE_URL=http://$SERVER_IP:8002"
-echo "  export ANTHROPIC_AUTH_TOKEN=dummy"
-echo "  claude --model qwen3.5-35b"
+echo "Container: $CONTAINER"
+if [ -n "$PORT" ]; then
+    echo "Port: $PORT"
+    echo "Server IP: $SERVER_IP"
+    echo ""
+    echo "Test from this machine:"
+    echo "  curl http://localhost:$PORT/v1/models"
+    echo ""
+    echo "Test from client machine:"
+    echo "  curl http://$SERVER_IP:$PORT/v1/models"
+    echo ""
+    echo "Configure Claude Code on client:"
+    echo "  export ANTHROPIC_BASE_URL=http://$SERVER_IP:$PORT"
+    echo "  export ANTHROPIC_AUTH_TOKEN=dummy"
+    echo "  claude --model <model-name>"
+else
+    echo "Server IP: $SERVER_IP"
+    echo ""
+    echo "⚠ Port information unavailable"
+fi
 echo ""
 echo "Monitor logs:"
 echo "  docker logs -f $CONTAINER"
