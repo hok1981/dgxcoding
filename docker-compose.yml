@@ -73,3 +73,37 @@ services:
     restart: unless-stopped
     profiles:
       - large
+
+  deepseek-v32-speciale:
+    image: vllm/vllm-openai:cu130-nightly
+    container_name: deepseek-v32-speciale
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_TOKEN=${HF_TOKEN}
+    ports:
+      - "0.0.0.0:8004:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    shm_size: '64gb'
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      deepseek-ai/DeepSeek-V3.2-Speciale
+      --served-model-name deepseek-v32-speciale
+      --port 8000
+      --host 0.0.0.0
+      --max-model-len 32768
+      --gpu-memory-utilization 0.75
+      --enable-prefix-caching
+      --trust-remote-code
+    restart: unless-stopped

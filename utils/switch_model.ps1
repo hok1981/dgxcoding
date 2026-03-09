@@ -12,14 +12,16 @@ $ProjectDir = Split-Path -Parent $PSScriptRoot
 $Models = @{
     "35b" = "qwen35-35b"
     "122b" = "qwen35-122b"
+    "deepseek" = "deepseek-v32-speciale"
 }
 
 function Show-Usage {
     Write-Host "Usage: .\switch_model.ps1 <model>" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Available models:"
-    Write-Host "  35b   - Qwen3.5-35B-A3B (30-50 tok/s, 262K context)"
-    Write-Host "  122b  - Qwen3.5-122B-A10B (15-25 tok/s, 65K context)"
+    Write-Host "  35b      - Qwen3.5-35B-A3B (30-50 tok/s, 262K context)"
+    Write-Host "  122b     - Qwen3.5-122B-A10B (15-25 tok/s, 65K context)"
+    Write-Host "  deepseek - DeepSeek-V3.2-Speciale (30-40 tok/s, 32K context, #1 coding)"
     Write-Host ""
     Write-Host "Examples:"
     Write-Host "  .\switch_model.ps1 35b    # Switch to 35B model"

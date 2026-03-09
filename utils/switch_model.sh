@@ -18,6 +18,7 @@ get_service_name() {
     case "$1" in
         35b) echo "qwen35-35b" ;;
         122b) echo "qwen35-122b" ;;
+        deepseek) echo "deepseek-v32-speciale" ;;
         *) echo "" ;;
     esac
 }
@@ -26,8 +27,9 @@ show_usage() {
     echo "Usage: $0 <model>"
     echo ""
     echo "Available models:"
-    echo "  35b   - Qwen3.5-35B-A3B (30-50 tok/s, 262K context)"
-    echo "  122b  - Qwen3.5-122B-A10B (15-25 tok/s, 65K context)"
+    echo "  35b      - Qwen3.5-35B-A3B (30-50 tok/s, 262K context)"
+    echo "  122b     - Qwen3.5-122B-A10B (15-25 tok/s, 65K context)"
+    echo "  deepseek - DeepSeek-V3.2-Speciale (30-40 tok/s, 32K context, #1 coding)"
     echo ""
     echo "Examples:"
     echo "  $0 35b    # Switch to 35B model"
