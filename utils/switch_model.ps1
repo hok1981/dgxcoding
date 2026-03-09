@@ -13,6 +13,8 @@ $Models = @{
     "35b" = "qwen35-35b"
     "122b" = "qwen35-122b"
     "deepseek" = "deepseek-v32-speciale"
+    "kimi" = "kimi-k25"
+    "mimo" = "mimo-v2-flash"
 }
 
 function Show-Usage {
@@ -22,6 +24,8 @@ function Show-Usage {
     Write-Host "  35b      - Qwen3.5-35B-A3B (30-50 tok/s, 262K context)"
     Write-Host "  122b     - Qwen3.5-122B-A10B (15-25 tok/s, 65K context)"
     Write-Host "  deepseek - DeepSeek-V3.2-Speciale (30-40 tok/s, 32K context, #1 coding)"
+    Write-Host "  kimi     - Kimi-K2.5 (30-40 tok/s, 32K context, #2 overall, #5 coding)"
+    Write-Host "  mimo     - MiMo-V2-Flash (35-45 tok/s, 32K context, #3 coding)"
     Write-Host ""
     Write-Host "Examples:"
     Write-Host "  .\switch_model.ps1 35b    # Switch to 35B model"

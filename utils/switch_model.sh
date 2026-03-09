@@ -19,6 +19,8 @@ get_service_name() {
         35b) echo "qwen35-35b" ;;
         122b) echo "qwen35-122b" ;;
         deepseek) echo "deepseek-v32-speciale" ;;
+        kimi) echo "kimi-k25" ;;
+        mimo) echo "mimo-v2-flash" ;;
         *) echo "" ;;
     esac
 }
@@ -30,6 +32,8 @@ show_usage() {
     echo "  35b      - Qwen3.5-35B-A3B (30-50 tok/s, 262K context)"
     echo "  122b     - Qwen3.5-122B-A10B (15-25 tok/s, 65K context)"
     echo "  deepseek - DeepSeek-V3.2-Speciale (30-40 tok/s, 32K context, #1 coding)"
+    echo "  kimi     - Kimi-K2.5 (30-40 tok/s, 32K context, #2 overall, #5 coding)"
+    echo "  mimo     - MiMo-V2-Flash (35-45 tok/s, 32K context, #3 coding)"
     echo ""
     echo "Examples:"
     echo "  $0 35b    # Switch to 35B model"
