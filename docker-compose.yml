@@ -27,13 +27,15 @@ services:
       --served-model-name qwen3.5-35b
       --port 8000
       --host 0.0.0.0
-      --max-model-len 262144
-      --gpu-memory-utilization 0.80
+      --max-model-len 32768
+      --gpu-memory-utilization 0.50
       --reasoning-parser qwen3
       --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
       --enable-prefix-caching
     restart: unless-stopped
+    profiles:
+      - qwen35b
 
   qwen35-122b:
     image: vllm/vllm-openai:cu130-nightly
@@ -63,16 +65,16 @@ services:
       --served-model-name qwen3.5-122b
       --port 8000
       --host 0.0.0.0
-      --max-model-len 32768
+      --max-model-len 16384
       --max-num-batched-tokens 4096
-      --gpu-memory-utilization 0.65
+      --gpu-memory-utilization 0.50
       --reasoning-parser qwen3
       --enable-auto-tool-choice
       --tool-call-parser qwen3_coder
       --enable-prefix-caching
     restart: unless-stopped
     profiles:
-      - large
+      - qwen122b
 
   deepseek-v32-speciale:
     image: vllm/vllm-openai:cu130-nightly
@@ -102,11 +104,13 @@ services:
       --served-model-name deepseek-v32-speciale
       --port 8000
       --host 0.0.0.0
-      --max-model-len 32768
-      --gpu-memory-utilization 0.75
+      --max-model-len 16384
+      --gpu-memory-utilization 0.50
       --enable-prefix-caching
       --trust-remote-code
     restart: unless-stopped
+    profiles:
+      - deepseek
 
   kimi-k25:
     image: vllm/vllm-openai:cu130-nightly
@@ -136,11 +140,13 @@ services:
       --served-model-name kimi-k25
       --port 8000
       --host 0.0.0.0
-      --max-model-len 32768
-      --gpu-memory-utilization 0.75
+      --max-model-len 16384
+      --gpu-memory-utilization 0.50
       --enable-prefix-caching
       --trust-remote-code
     restart: unless-stopped
+    profiles:
+      - kimi
 
   mimo-v2-flash:
     image: vllm/vllm-openai:cu130-nightly
@@ -170,11 +176,13 @@ services:
       --served-model-name mimo-v2-flash
       --port 8000
       --host 0.0.0.0
-      --max-model-len 65536
-      --max-num-batched-tokens 32768
-      --gpu-memory-utilization 0.90
+      --max-model-len 16384
+      --max-num-batched-tokens 4096
+      --gpu-memory-utilization 0.50
       --trust-remote-code
       --generation-config vllm
       --tool-call-parser qwen3_xml
       --reasoning-parser qwen3
     restart: unless-stopped
+    profiles:
+      - mimo
