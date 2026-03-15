@@ -6,6 +6,11 @@ if [ -z "${MODEL_HANDLE:-}" ]; then
   exit 1
 fi
 
+if [ -n "${PRE_INSTALL:-}" ]; then
+  echo "Installing: $PRE_INSTALL"
+  pip install --quiet $PRE_INSTALL
+fi
+
 echo "Downloading: $MODEL_HANDLE"
 hf download "$MODEL_HANDLE"
 

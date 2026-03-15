@@ -234,6 +234,7 @@ services:
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=Qwen/Qwen3.5-35B-A3B-FP8
       - MAX_BATCH_SIZE=16
+      - PRE_INSTALL=--upgrade transformers
     ports:
       - "0.0.0.0:8010:8000"
     volumes:

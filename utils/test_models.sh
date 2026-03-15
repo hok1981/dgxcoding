@@ -33,7 +33,7 @@ ALL_MODELS=(
   "phi4|phi4-reasoning|8004|Phi-4-reasoning-plus-NVFP4"
   "llama3370b|llama33-70b|8005|Llama-3.3-70B-Instruct-NVFP4"
   "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4"
-  "kimi|kimi-k25|8008|Kimi-K2.5"
+  # "kimi|kimi-k25|8008|Kimi-K2.5"  # TRT-LLM 1.3.0rc7 bug: inputs_quant_config is None in load_hf_quant_config
   "gptoss120b|gpt-oss-120b|8006|gpt-oss-120b"
   "nemotronnano|nemotron-nano|8009|Nemotron-3-Nano-30B-A3B-NVFP4"
   "qwen3535b|qwen35-35b|8010|Qwen3.5-35B-A3B-FP8"
