@@ -11,6 +11,7 @@ hf download "$MODEL_HANDLE"
 
 echo "Starting trtllm-serve: $MODEL_HANDLE"
 exec trtllm-serve "$MODEL_HANDLE" \
+  --host 0.0.0.0 \
   --max_batch_size "${MAX_BATCH_SIZE:-32}" \
   --trust_remote_code \
   --port 8000 \

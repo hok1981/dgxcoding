@@ -29,9 +29,12 @@ TEST_PROMPT="Write a one-sentence summary of the Pythagorean theorem."
 # Models to test: "profile|container|port|name"
 ALL_MODELS=(
   "qwen3a3b|qwen3-a3b|8002|Qwen3-30B-A3B-NVFP4"
-  "qwen122a10b|qwen35-a10b|8003|Qwen3.5-122B-A10B"
-  "deepseek|deepseek-v32-speciale|8004|DeepSeek-V3.2-Speciale"
-  "kimi|kimi-k25|8005|Kimi-K2.5"
+  "qwen332b|qwen3-32b|8003|Qwen3-32B-NVFP4"
+  "phi4|phi4-reasoning|8004|Phi-4-reasoning-plus-NVFP4"
+  "llama3370b|llama33-70b|8005|Llama-3.3-70B-Instruct-NVFP4"
+  "deepseek|deepseek-v32|8006|DeepSeek-V3.2-NVFP4"
+  "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4"
+  "kimi|kimi-k25|8008|Kimi-K2.5"
 )
 
 # ── Colors ───────────────────────────────────────────────────────────────────
@@ -156,19 +159,26 @@ test_model() {
   local model_id
   model_id=$(curl -sf "http://localhost:${port}/v1/models" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null || echo "unknown")
 
-  local response
-  local infer_ok=false
-  if response=$(curl -sf "http://localhost:${port}/v1/chat/completions" \
+  local response infer_ok=false toks_per_sec="N/A" completion_tokens="0"
+  local infer_start infer_end infer_ms
+  infer_start=$(date +%s%3N)
+  if response=$(curl -sf --max-time 120 "http://localhost:${port}/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -d "{
       \"model\": \"${model_id}\",
       \"messages\": [{\"role\": \"user\", \"content\": \"${TEST_PROMPT}\"}],
-      \"max_tokens\": 100,
+      \"max_tokens\": 512,
       \"temperature\": 0
     }" 2>&1); then
+    infer_end=$(date +%s%3N)
+    infer_ms=$(( infer_end - infer_start ))
     local answer
     answer=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])" 2>/dev/null || echo "(parse error)")
-    ok "Inference succeeded: $answer"
+    completion_tokens=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('usage',{}).get('completion_tokens',0))" 2>/dev/null || echo "0")
+    toks_per_sec=$(python3 -c "print(f'{${completion_tokens} / (${infer_ms} / 1000):.1f}')" 2>/dev/null || echo "N/A")
+    ok "Inference succeeded in ${infer_ms}ms — ${completion_tokens} tokens @ ${toks_per_sec} tok/s"
+    log "Response:\n${answer}"
+    echo "  [${name}] RESPONSE: ${answer}" >> "$RESULTS_FILE"
     infer_ok=true
   else
     error "Inference failed: $response"
@@ -196,16 +206,16 @@ test_model() {
 
   local status="OK"
   [[ "$infer_ok" != "true" ]] && status="LOADED_NO_INFER"
-  record_result "$name" "$status" "$mem_before" "$mem_loaded" "$mem_peak" "$gpu_peak"
+  record_result "$name" "$status" "$mem_before" "$mem_loaded" "$mem_peak" "$gpu_peak" "$toks_per_sec"
 }
 
 record_result() {
-  local name="$1" status="$2" mem_before="$3" mem_loaded="$4" mem_peak="$5" gpu_peak="$6"
+  local name="$1" status="$2" mem_before="$3" mem_loaded="$4" mem_peak="$5" gpu_peak="$6" toks_per_sec="${7:-N/A}"
   local delta="N/A"
   [[ "$mem_loaded" != "N/A" && "$mem_before" != "N/A" ]] && delta=$(( mem_loaded - mem_before ))
 
-  printf "%-30s  %-20s  before=%6s MiB  loaded=%6s MiB  delta=%6s MiB  gpu_peak=%6s MiB\n" \
-    "$name" "$status" "$mem_before" "$mem_loaded" "$delta" "$gpu_peak" \
+  printf "%-38s  %-20s  ram_delta=%6s MiB  ram_peak=%6s MiB  gpu=%6s MiB  tok/s=%s\n" \
+    "$name" "$status" "$delta" "$mem_peak" "$gpu_peak" "$toks_per_sec" \
     | tee -a "$RESULTS_FILE"
 }
 
@@ -246,7 +256,7 @@ main() {
   fi
 
   if [[ ${#targets[@]} -eq 0 ]]; then
-    error "No matching models found. Valid profile names: qwen35b qwen122b deepseek kimi mimo"
+    error "No matching models found. Valid profile names: qwen3a3b qwen332b phi4 llama3370b deepseek nemotron120b kimi"
     exit 1
   fi
 
