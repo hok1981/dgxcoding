@@ -35,7 +35,7 @@ ALL_MODELS=(
   "qwen332b|qwen3-32b|8003|Qwen3-32B-NVFP4|openai"
   "phi4|phi4-reasoning|8004|Phi-4-reasoning-plus-NVFP4|openai"
   "llama3370b|llama33-70b|8005|Llama-3.3-70B-Instruct-NVFP4|openai"
-  "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4|openai"
+  # "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4|openai"  # Weight footprint ~110 GiB (NVFP4 + scales) — consistently OOMs on 119.7 GiB regardless of free_gpu_memory_fraction (0.90/0.50/0.20 all failed)
   # "kimi|kimi-k25|8008|Kimi-K2.5|openai"  # TRT-LLM 1.3.0rc7 bug: inputs_quant_config is None
   "gptoss120b|gpt-oss-120b|8006|gpt-oss-120b|openai"
   "nemotronnano|nemotron-nano|8009|Nemotron-3-Nano-30B-A3B-NVFP4|openai"
