@@ -1,6 +1,10 @@
 print_iter_log: false
 kv_cache_config:
   dtype: "auto"
-  free_gpu_memory_fraction: 0.70
+  # DGX Spark: ~116 GiB free at startup (unified memory, all visible to GPU).
+  # free_gpu_memory_fraction × 116 GiB = KV cache pre-allocated.
+  # 0.30 → ~35 GiB KV cache, sufficient for 32K+ context on a single-user setup.
+  # Models <70B all fit comfortably; small MoE models (A3B) can co-run with Parakeet STT.
+  free_gpu_memory_fraction: 0.30
 cuda_graph_config:
   enable_padding: true

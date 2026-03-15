@@ -1,10 +1,10 @@
 print_iter_log: false
 kv_cache_config:
   dtype: "auto"
-  # Reduced from default 0.70 to prevent OOM. Measured weights ~60 GiB (120B × NVFP4).
-  # At 0.90 TRT-LLM pre-allocated 54 GiB KV cache → 114 GiB total → killed.
-  # At 0.50: weights (60) + KV cache (30) ≈ 90 GiB → ~30 GiB headroom on 119.7 GiB system.
-  # Parallel weight loading disabled via env var to prevent startup spike.
-  free_gpu_memory_fraction: 0.50
+  # free_gpu_memory_fraction = fraction of FREE memory at startup (not total).
+  # DGX Spark: ~116 GiB free at start (unified memory, all visible to GPU).
+  # At 0.50: 0.50 × 116 = 58 GiB KV + 60 GiB weights + 3 GiB baseline = 121 GiB → OOM
+  # At 0.20: 0.20 × 116 = 23 GiB KV + 60 GiB weights + 3 GiB baseline = 86 GiB → 34 GiB headroom
+  free_gpu_memory_fraction: 0.20
 cuda_graph_config:
   enable_padding: true

@@ -181,7 +181,7 @@ services:
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ~/.cache/tiktoken_encodings:/root/.cache/tiktoken_encodings
-      - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
+      - ./config/trtllm-config-gptoss.yml:/tmp/extra-llm-api-config.yml
       - ./config/start_trtllm.sh:/start_trtllm.sh
     shm_size: '64gb'
     ipc: host
