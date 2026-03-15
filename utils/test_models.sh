@@ -178,7 +178,7 @@ test_model() {
     toks_per_sec=$(python3 -c "print(f'{${completion_tokens} / (${infer_ms} / 1000):.1f}')" 2>/dev/null || echo "N/A")
     ok "Inference succeeded in ${infer_ms}ms — ${completion_tokens} tokens @ ${toks_per_sec} tok/s"
     log "Response:\n${answer}"
-    echo "  [${name}] RESPONSE: ${answer}" >> "$RESULTS_FILE"
+    echo "RESPONSE [${name}]: ${answer}" >> "$RESULTS_FILE"
     infer_ok=true
   else
     error "Inference failed: $response"
@@ -214,9 +214,9 @@ record_result() {
   local delta="N/A"
   [[ "$mem_loaded" != "N/A" && "$mem_before" != "N/A" ]] && delta=$(( mem_loaded - mem_before ))
 
-  printf "%-38s  %-20s  ram_delta=%6s MiB  ram_peak=%6s MiB  gpu=%6s MiB  tok/s=%s\n" \
+  printf "RESULT| %-38s | %-18s | %6s MiB | %6s MiB | %6s MiB | %s tok/s\n" \
     "$name" "$status" "$delta" "$mem_peak" "$gpu_peak" "$toks_per_sec" \
-    | tee -a "$RESULTS_FILE"
+    >> "$RESULTS_FILE"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -266,10 +266,19 @@ main() {
   done
 
   echo ""
-  echo -e "${BOLD}════════════════ RESULTS SUMMARY ════════════════${RESET}"
-  grep -v "^==\|^Model test\|^System\|^GPU" "$RESULTS_FILE" | tail -$(( ${#targets[@]} + 2 ))
+  echo -e "${BOLD}╔══════════════════════════════════════════════════════════════════════════════════╗${RESET}"
+  echo -e "${BOLD}║                              RESULTS SUMMARY                                    ║${RESET}"
+  echo -e "${BOLD}╠══════════════════════════════╦════════════════════╦══════════╦══════════╦════════╣${RESET}"
+  printf "${BOLD}║ %-28s ║ %-18s ║ %8s ║ %8s ║ %6s ║${RESET}\n" \
+    "Model" "Status" "RAM +MiB" "RAM peak" "tok/s"
+  echo -e "${BOLD}╠══════════════════════════════╬════════════════════╬══════════╬══════════╬════════╣${RESET}"
+  while IFS='|' read -r _ name status delta peak _gpu toks; do
+    printf "║ %-28s ║ %-18s ║ %8s ║ %8s ║ %6s ║\n" \
+      "${name// /}" "${status// /}" "${delta// /}" "${peak// /}" "${toks// /}"
+  done < <(grep "^RESULT|" "$RESULTS_FILE" | tail -"${#targets[@]}")
+  echo -e "${BOLD}╚══════════════════════════════╩════════════════════╩══════════╩══════════╩════════╝${RESET}"
   echo ""
-  echo "Full results saved to: $RESULTS_FILE"
+  echo "Full results (with responses) saved to: $RESULTS_FILE"
 }
 
 main "$@"
