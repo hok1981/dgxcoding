@@ -253,15 +253,12 @@ with wave.open(buf, 'wb') as w:
 buf.seek(0)
 with open('/tmp/test_audio.wav', 'wb') as f:
     f.write(buf.read())" 2>/dev/null
-    # /v1/audio/transcriptions uses the Riva model name, not the NIM container ID
-    local nim_model="parakeet-1-1b-ctc-riva"
-    log "NIM Riva model: ${nim_model}"
-    # POST audio — don't use -f so we always capture the response body for diagnostics
+    # POST audio: no model field, just language — matches VideoTranscript's working HTTP fallback
     local http_code asr_response
     asr_response=$(curl -s --max-time 60 -w "\n__HTTP_CODE__%{http_code}" \
       -X POST "http://localhost:${port}/v1/audio/transcriptions" \
-      -F "file=@/tmp/test_audio.wav" \
-      -F "model=${nim_model}" 2>&1)
+      -F "file=@/tmp/test_audio.wav;type=audio/wav" \
+      -F "language=en-US" 2>&1)
     http_code=$(echo "$asr_response" | grep -o '__HTTP_CODE__[0-9]*' | grep -o '[0-9]*')
     asr_response=$(echo "$asr_response" | sed 's/__HTTP_CODE__[0-9]*//')
     if [[ "$http_code" == "200" ]]; then
@@ -272,6 +269,7 @@ with open('/tmp/test_audio.wav', 'wb') as f:
       infer_ok=true
     else
       error "Transcription failed (HTTP ${http_code}): ${asr_response}"
+      log "  Tip: check /v1/models output above for correct model name"
       echo "RESPONSE [${name}]: FAILED HTTP ${http_code}: ${asr_response}" >> "$RESULTS_FILE"
     fi
 
