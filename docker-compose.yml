@@ -7,11 +7,13 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=Qwen/Qwen3.5-35B-A3B
+      - MAX_BATCH_SIZE=32
     ports:
       - "0.0.0.0:8002:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
+      - ./config/start_trtllm.sh:/start_trtllm.sh
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -24,13 +26,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command: >
-      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
-        trtllm-serve "$MODEL_HANDLE"
-        --max_batch_size 32
-        --trust_remote_code
-        --port 8000
-        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
+    command: bash /start_trtllm.sh
     restart: unless-stopped
     profiles:
       - qwen35a3b
@@ -43,11 +39,13 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=Qwen/Qwen3.5-122B-A10B
+      - MAX_BATCH_SIZE=16
     ports:
       - "0.0.0.0:8003:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
+      - ./config/start_trtllm.sh:/start_trtllm.sh
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -60,13 +58,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command: >
-      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
-        trtllm-serve "$MODEL_HANDLE"
-        --max_batch_size 16
-        --trust_remote_code
-        --port 8000
-        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
+    command: bash /start_trtllm.sh
     restart: unless-stopped
     profiles:
       - qwen122a10b
@@ -79,11 +71,13 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=deepseek-ai/DeepSeek-V3.2-Speciale
+      - MAX_BATCH_SIZE=16
     ports:
       - "0.0.0.0:8004:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
+      - ./config/start_trtllm.sh:/start_trtllm.sh
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -96,13 +90,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command: >
-      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
-        trtllm-serve "$MODEL_HANDLE"
-        --max_batch_size 16
-        --trust_remote_code
-        --port 8000
-        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
+    command: bash /start_trtllm.sh
     restart: unless-stopped
     profiles:
       - deepseek
@@ -117,11 +105,13 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=moonshotai/Kimi-K2.5
+      - MAX_BATCH_SIZE=16
     ports:
       - "0.0.0.0:8005:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
+      - ./config/start_trtllm.sh:/start_trtllm.sh
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -134,13 +124,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command: >
-      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
-        trtllm-serve "$MODEL_HANDLE"
-        --max_batch_size 16
-        --trust_remote_code
-        --port 8000
-        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
+    command: bash /start_trtllm.sh
     restart: unless-stopped
     profiles:
       - kimi
