@@ -1,0 +1,10 @@
+print_iter_log: false
+kv_cache_config:
+  dtype: "auto"
+  # GPT-OSS-120B uses PyTorch backend (not TRT) and self-limits KV cache.
+  # Empirically loaded only 72.7 GiB total with 0.70 — PyTorch backend likely
+  # measures free memory AFTER weight loading (~50 GiB free → 0.25 × 50 = 12 GiB KV).
+  # Using 0.25 here to be explicit and safe, consistent with empirical behaviour.
+  free_gpu_memory_fraction: 0.25
+cuda_graph_config:
+  enable_padding: true

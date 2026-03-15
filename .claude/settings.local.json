@@ -36,7 +36,8 @@
       "Bash(curl --max-time 15 -s \"https://hub.docker.com/v2/repositories/rhasspy/wyoming-piper/tags/?page_size=20\")",
       "Bash(curl --max-time 15 -s \"https://hub.docker.com/v2/repositories/rhasspy/wyoming-whisper/tags/?page_size=20\")",
       "Read(//d/git/spark/VideoTranscript/**)",
-      "WebFetch(domain:cookbook.openai.com)"
+      "WebFetch(domain:cookbook.openai.com)",
+      "WebFetch(domain:thepihut.com)"
     ]
   }
 }
