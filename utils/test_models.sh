@@ -348,7 +348,29 @@ print_summary() {
   echo "  Free GiB  = minimum free RAM seen (kill threshold: $(mib_to_gib $MEM_KILL_FREE) GiB)"
   echo "  Perf      = decode tok/s, mean of ${PERF_RUNS} runs at ${PERF_TOKENS} tokens (LLMs) | CPU/N/A for STT/TTS"
   echo ""
-  echo "Full results (with responses) saved to: $RESULTS_FILE"
+  echo "Full results saved to: $RESULTS_FILE"
+
+  # ── Write plain-text table to results file ───────────────────────────────
+  {
+    echo ""
+    echo "======================================== SUMMARY TABLE"
+    echo "Run: $(date)  |  Perf = decode tok/s (${PERF_RUNS} runs × ${PERF_TOKENS} tokens)"
+    echo "+----------------------------------+----------------------+---------+---------+---------+--------+"
+    printf "| %-32s | %-20s | %7s | %7s | %7s | %6s |\n" \
+      "Model" "Status" "RAM+GiB" "PeakGiB" "FreeGiB" "Perf"
+    echo "+----------------------------------+----------------------+---------+---------+---------+--------+"
+    while IFS=$'\t' read -r _ name status delta peak _gpu toks minfree; do
+      local delta_g peak_g free_g
+      delta_g=$(mib_to_gib "$delta")
+      peak_g=$(mib_to_gib "$peak")
+      free_g=$(mib_to_gib "$minfree")
+      name="${name:0:32}"
+      printf "| %-32s | %-20s | %7s | %7s | %7s | %6s |\n" \
+        "$name" "$status" "$delta_g" "$peak_g" "$free_g" "$toks"
+    done < <(grep "^RESULT" "$RESULTS_FILE" | tail -"$count")
+    echo "+----------------------------------+----------------------+---------+---------+---------+--------+"
+    echo ""
+  } >> "$RESULTS_FILE"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
