@@ -1,12 +1,12 @@
 services:
-  qwen35-a3b:
+  qwen3-a3b:
     image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
-    container_name: qwen35-a3b
+    container_name: qwen3-a3b
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
-      - MODEL_HANDLE=Qwen/Qwen3.5-35B-A3B
+      - MODEL_HANDLE=nvidia/Qwen3-30B-A3B-NVFP4
       - MAX_BATCH_SIZE=32
     ports:
       - "0.0.0.0:8002:8000"
@@ -29,7 +29,7 @@ services:
     command: bash /start_trtllm.sh
     restart: unless-stopped
     profiles:
-      - qwen35a3b
+      - qwen3a3b
 
   qwen35-a10b:
     image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6

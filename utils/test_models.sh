@@ -28,7 +28,7 @@ TEST_PROMPT="Write a one-sentence summary of the Pythagorean theorem."
 
 # Models to test: "profile|container|port|name"
 ALL_MODELS=(
-  "qwen35a3b|qwen35-a3b|8002|Qwen3.5-35B-A3B"
+  "qwen3a3b|qwen3-a3b|8002|Qwen3-30B-A3B-NVFP4"
   "qwen122a10b|qwen35-a10b|8003|Qwen3.5-122B-A10B"
   "deepseek|deepseek-v32-speciale|8004|DeepSeek-V3.2-Speciale"
   "kimi|kimi-k25|8005|Kimi-K2.5"
