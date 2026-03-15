@@ -5,7 +5,7 @@
 #   ./utils/test_models.sh              # test all models
 #   ./utils/test_models.sh qwen3a3b     # test one model by profile name
 #
-# Profile names: qwen3a3b, qwen332b, phi4, llama3370b, deepseek, nemotron120b, kimi
+# Profile names: qwen3a3b, qwen332b, phi4, llama3370b, nemotron120b, gptoss120b, nemotronnano, parakeet, piper
 
 set -euo pipefail
 
@@ -26,17 +26,22 @@ MONITOR_INTERVAL=5
 # Test prompt — /no_think suppresses reasoning traces on Qwen3/DeepSeek
 TEST_PROMPT="Write a one-sentence summary of the Pythagorean theorem. /no_think"
 
-# Models to test: "profile|container|port|name"
+# Models to test: "profile|container|port|name|type"
+# type: openai (default) = LLM with /v1/chat/completions
+#        nim-stt          = NVIDIA NIM STT, health at /v1/health/ready, test via /v1/audio/transcriptions
+#        wyoming-tts      = Wyoming TTS (TCP), memory-only test
 ALL_MODELS=(
-  "qwen3a3b|qwen3-a3b|8002|Qwen3-30B-A3B-NVFP4"
-  "qwen332b|qwen3-32b|8003|Qwen3-32B-NVFP4"
-  "phi4|phi4-reasoning|8004|Phi-4-reasoning-plus-NVFP4"
-  "llama3370b|llama33-70b|8005|Llama-3.3-70B-Instruct-NVFP4"
-  "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4"
-  # "kimi|kimi-k25|8008|Kimi-K2.5"  # TRT-LLM 1.3.0rc7 bug: inputs_quant_config is None in load_hf_quant_config
-  "gptoss120b|gpt-oss-120b|8006|gpt-oss-120b"
-  "nemotronnano|nemotron-nano|8009|Nemotron-3-Nano-30B-A3B-NVFP4"
-  "qwen3535b|qwen35-35b|8010|Qwen3.5-35B-A3B-FP8"
+  "qwen3a3b|qwen3-a3b|8002|Qwen3-30B-A3B-NVFP4|openai"
+  "qwen332b|qwen3-32b|8003|Qwen3-32B-NVFP4|openai"
+  "phi4|phi4-reasoning|8004|Phi-4-reasoning-plus-NVFP4|openai"
+  "llama3370b|llama33-70b|8005|Llama-3.3-70B-Instruct-NVFP4|openai"
+  "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4|openai"
+  # "kimi|kimi-k25|8008|Kimi-K2.5|openai"  # TRT-LLM 1.3.0rc7 bug: inputs_quant_config is None
+  "gptoss120b|gpt-oss-120b|8006|gpt-oss-120b|openai"
+  "nemotronnano|nemotron-nano|8009|Nemotron-3-Nano-30B-A3B-NVFP4|openai"
+  # "qwen3535b|qwen35-35b|8010|Qwen3.5-35B-A3B-FP8|openai"  # qwen3_5_moe arch not in transformers==4.57.1
+  "parakeet|parakeet-ctc|9000|Parakeet-1.1B-CTC|nim-stt"
+  "piper|wyoming-piper|10200|Wyoming-Piper-TTS|wyoming-tts"
 )
 
 # ── Colors ───────────────────────────────────────────────────────────────────
@@ -109,7 +114,7 @@ watchdog() {
 
 # ── Test one model ────────────────────────────────────────────────────────────
 test_model() {
-  local profile="$1" container="$2" port="$3" name="$4"
+  local profile="$1" container="$2" port="$3" name="$4" api_type="${5:-openai}"
 
   echo ""
   echo -e "${BOLD}════════════════════════════════════════════════════════${RESET}"
@@ -154,7 +159,16 @@ test_model() {
       return
     fi
 
-    if curl -sf "http://localhost:${port}/v1/models" > /dev/null 2>&1; then
+    local api_ready=false
+    case "$api_type" in
+      openai)
+        curl -sf "http://localhost:${port}/v1/models" > /dev/null 2>&1 && api_ready=true ;;
+      nim-stt)
+        curl -sf "http://localhost:${port}/v1/health/ready" > /dev/null 2>&1 && api_ready=true ;;
+      wyoming-tts)
+        timeout 2 bash -c "(echo '' > /dev/tcp/localhost/${port})" 2>/dev/null && api_ready=true ;;
+    esac
+    if [[ "$api_ready" == "true" ]]; then
       ready=true
       break
     fi
@@ -195,34 +209,68 @@ test_model() {
   min_free_seen=$(cat "/tmp/wdog_minfree_${container}" 2>/dev/null || echo "N/A")
   log "Loaded: +$(mib_to_gib $mem_delta) GiB RAM  |  GPU: ${gpu_loaded} MiB / $(gpu_mem_total_mib) MiB  |  min free: $(mib_to_gib $min_free_seen) GiB"
 
-  # Run test inference
+  # Run test inference (varies by api_type)
   log "Running test inference..."
-  local model_id
-  model_id=$(curl -sf "http://localhost:${port}/v1/models" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null || echo "unknown")
+  local infer_ok=false toks_per_sec="N/A"
 
-  local response infer_ok=false toks_per_sec="N/A" completion_tokens="0"
-  local infer_start infer_end infer_ms
-  infer_start=$(date +%s%3N)
-  if response=$(curl -sf --max-time 120 "http://localhost:${port}/v1/chat/completions" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"model\": \"${model_id}\",
-      \"messages\": [{\"role\": \"user\", \"content\": \"${TEST_PROMPT}\"}],
-      \"max_tokens\": 1024,
-      \"temperature\": 0
-    }" 2>&1); then
-    infer_end=$(date +%s%3N)
-    infer_ms=$(( infer_end - infer_start ))
-    local answer
-    answer=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])" 2>/dev/null || echo "(parse error)")
-    completion_tokens=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('usage',{}).get('completion_tokens',0))" 2>/dev/null || echo "0")
-    toks_per_sec=$(python3 -c "print(f'{${completion_tokens} / (${infer_ms} / 1000):.1f}')" 2>/dev/null || echo "N/A")
-    ok "Inference: ${infer_ms}ms — ${completion_tokens} tokens @ ${toks_per_sec} tok/s"
-    log "Response: ${answer}"
-    echo "RESPONSE [${name}]: ${answer}" >> "$RESULTS_FILE"
+  if [[ "$api_type" == "openai" ]]; then
+    local model_id
+    model_id=$(curl -sf "http://localhost:${port}/v1/models" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null || echo "unknown")
+    local response completion_tokens="0"
+    local infer_start infer_end infer_ms
+    infer_start=$(date +%s%3N)
+    if response=$(curl -sf --max-time 120 "http://localhost:${port}/v1/chat/completions" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"model\": \"${model_id}\",
+        \"messages\": [{\"role\": \"user\", \"content\": \"${TEST_PROMPT}\"}],
+        \"max_tokens\": 1024,
+        \"temperature\": 0
+      }" 2>&1); then
+      infer_end=$(date +%s%3N)
+      infer_ms=$(( infer_end - infer_start ))
+      local answer
+      answer=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])" 2>/dev/null || echo "(parse error)")
+      completion_tokens=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('usage',{}).get('completion_tokens',0))" 2>/dev/null || echo "0")
+      toks_per_sec=$(python3 -c "print(f'{${completion_tokens} / (${infer_ms} / 1000):.1f}')" 2>/dev/null || echo "N/A")
+      ok "Inference: ${infer_ms}ms — ${completion_tokens} tokens @ ${toks_per_sec} tok/s"
+      log "Response: ${answer}"
+      echo "RESPONSE [${name}]: ${answer}" >> "$RESULTS_FILE"
+      infer_ok=true
+    else
+      error "Inference failed: $response"
+    fi
+
+  elif [[ "$api_type" == "nim-stt" ]]; then
+    # Generate 0.5s of silence (8000 frames @ 16kHz) as a minimal WAV for transcription test
+    python3 -c "
+import wave, io
+buf = io.BytesIO()
+with wave.open(buf, 'wb') as w:
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+    w.writeframes(b'\x00' * 8000)
+buf.seek(0)
+with open('/tmp/test_audio.wav', 'wb') as f:
+    f.write(buf.read())" 2>/dev/null
+    local asr_response
+    if asr_response=$(curl -sf --max-time 60 \
+      -X POST "http://localhost:${port}/v1/audio/transcriptions" \
+      -F "file=@/tmp/test_audio.wav" \
+      -F "model=parakeet-1-1b-ctc-en-us" 2>&1); then
+      local transcript
+      transcript=$(echo "$asr_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('text','(silence)'))" 2>/dev/null || echo "(silence)")
+      ok "Transcription succeeded: '${transcript}'"
+      echo "RESPONSE [${name}]: silence → '${transcript}'" >> "$RESULTS_FILE"
+      infer_ok=true
+    else
+      error "Transcription failed: $asr_response"
+    fi
+
+  elif [[ "$api_type" == "wyoming-tts" ]]; then
+    ok "TTS service ready on port ${port} (Wyoming protocol — CPU only, no HTTP test)"
+    echo "RESPONSE [${name}]: Wyoming TTS ready" >> "$RESULTS_FILE"
     infer_ok=true
-  else
-    error "Inference failed: $response"
+    toks_per_sec="CPU"
   fi
 
   # Peak memory after inference
@@ -274,7 +322,7 @@ print_summary() {
   echo ""
   echo -e "${BOLD}${top}${RESET}"
   printf "${BOLD}║ %-32s │ %-20s │ %7s │ %7s │ %7s │ %6s ║${RESET}\n" \
-    "Model" "Status" "RAM +GiB" "Peak GiB" "Free GiB" "tok/s"
+    "Model" "Status" "RAM +GiB" "Peak GiB" "Free GiB" "Perf"
   echo -e "${BOLD}${hdr}${RESET}"
 
   while IFS=$'\t' read -r _ name status delta peak _gpu toks minfree; do
@@ -320,11 +368,11 @@ main() {
   if [[ "${1:-}" == "--list" ]]; then
     echo "Available models (pass profile name to test a single model):"
     echo ""
-    printf "  %-16s  %-40s  %s\n" "PROFILE" "MODEL" "PORT"
-    printf "  %-16s  %-40s  %s\n" "-------" "-----" "----"
+    printf "  %-16s  %-10s  %-40s  %s\n" "PROFILE" "TYPE" "MODEL" "PORT"
+    printf "  %-16s  %-10s  %-40s  %s\n" "-------" "----" "-----" "----"
     for entry in "${ALL_MODELS[@]}"; do
-      IFS='|' read -r profile _container port name <<< "$entry"
-      printf "  %-16s  %-40s  %s\n" "$profile" "$name" "$port"
+      IFS='|' read -r profile _container port name api_type <<< "$entry"
+      printf "  %-16s  %-10s  %-40s  %s\n" "$profile" "${api_type:-openai}" "$name" "$port"
     done
     echo ""
     echo "Usage:"
@@ -338,7 +386,7 @@ main() {
   local targets=()
   if [[ $# -gt 0 ]]; then
     for entry in "${ALL_MODELS[@]}"; do
-      local profile="${entry%%|*}"
+      IFS='|' read -r profile _ _ _ _ <<< "$entry"
       for arg in "$@"; do
         [[ "$profile" == "$arg" ]] && targets+=("$entry") && break
       done
@@ -348,13 +396,13 @@ main() {
   fi
 
   if [[ ${#targets[@]} -eq 0 ]]; then
-    error "No matching models found. Valid profile names: qwen3a3b qwen332b phi4 llama3370b nemotron120b kimi gptoss120b nemotronnano qwen3535b"
+    error "No matching models found. Run --list to see valid profile names."
     exit 1
   fi
 
   for entry in "${targets[@]}"; do
-    IFS='|' read -r profile container port name <<< "$entry"
-    test_model "$profile" "$container" "$port" "$name"
+    IFS='|' read -r profile container port name api_type <<< "$entry"
+    test_model "$profile" "$container" "$port" "$name" "${api_type:-openai}"
   done
 
   print_summary "${#targets[@]}"

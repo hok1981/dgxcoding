@@ -26,7 +26,17 @@
       "WebFetch(domain:community.home-assistant.io)",
       "WebFetch(domain:wiki.seeedstudio.com)",
       "WebFetch(domain:www.xda-developers.com)",
-      "WebFetch(domain:spark-arena.com)"
+      "WebFetch(domain:spark-arena.com)",
+      "Bash(curl -s https://hub.docker.com/v2/repositories/rhasspy/wyoming-piper/tags/?page_size=20)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(t[''''name''''], [a.get\\(''''architecture'''',''''''''\\) for a in t.get\\(''''images'''',[]\\)]\\) for t in data.get\\(''''results'''',[]\\)]\")",
+      "Bash(curl -s https://hub.docker.com/v2/repositories/rhasspy/wyoming-whisper/tags/?page_size=20)",
+      "Bash(curl --max-time 15 -s \"https://hub.docker.com/v2/repositories/linuxserver/faster-whisper/tags/?page_size=20\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(t[''''name''''], [a.get\\(''''architecture'''',''''?''''\\) for a in t.get\\(''''images'''',[]\\)]\\) for t in data.get\\(''''results'''',[]\\)]\")",
+      "Bash(node -e \"let d=''''''''; process.stdin.on\\(''''data'''',c=>d+=c\\); process.stdin.on\\(''''end'''',\\(\\)=>{const r=JSON.parse\\(d\\); r.results.forEach\\(t=>console.log\\(t.name, t.images.map\\(a=>a.architecture\\).join\\('''',''''\\)\\)\\);}\\)\")",
+      "Bash(curl --max-time 15 -s \"https://hub.docker.com/v2/repositories/rhasspy/wyoming-piper/tags/?page_size=20\")",
+      "Bash(curl --max-time 15 -s \"https://hub.docker.com/v2/repositories/rhasspy/wyoming-whisper/tags/?page_size=20\")",
+      "Read(//d/git/spark/VideoTranscript/**)",
+      "WebFetch(domain:cookbook.openai.com)"
     ]
   }
 }

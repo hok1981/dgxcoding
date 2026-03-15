@@ -170,10 +170,17 @@ services:
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=openai/gpt-oss-120b
       - MAX_BATCH_SIZE=8
+      # openai_harmony (Rust tiktoken) needs o200k_base.tiktoken at inference time.
+      # Pre-download once on host:
+      #   mkdir -p ~/.cache/tiktoken_encodings
+      #   wget -O ~/.cache/tiktoken_encodings/o200k_base.tiktoken \
+      #     https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken
+      - TIKTOKEN_ENCODINGS_BASE=/root/.cache/tiktoken_encodings
     ports:
       - "0.0.0.0:8006:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
+      - ~/.cache/tiktoken_encodings:/root/.cache/tiktoken_encodings
       - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
       - ./config/start_trtllm.sh:/start_trtllm.sh
     shm_size: '64gb'
@@ -234,7 +241,7 @@ services:
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=Qwen/Qwen3.5-35B-A3B-FP8
       - MAX_BATCH_SIZE=16
-      - PRE_INSTALL=--upgrade transformers
+      # PRE_INSTALL: qwen3_5_moe requires transformers>4.57.1 but TRT-LLM hard-pins 4.57.1 — wait for TRT-LLM update
     ports:
       - "0.0.0.0:8010:8000"
     volumes:
@@ -289,3 +296,54 @@ services:
     restart: unless-stopped
     profiles:
       - kimi
+
+  # ── Speech-to-Text: NVIDIA NIM Parakeet 1.1B CTC ───────────────────────────
+  # GPU-accelerated STT. Riva API: HTTP :9000, gRPC :50051
+  # Requires: NGC_API_KEY in .env (free NVIDIA account)
+  # First run: ~5-15 min (CUDA graph compilation)
+  parakeet-ctc:
+    image: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us:latest
+    container_name: parakeet-ctc
+    runtime: nvidia
+    environment:
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_HTTP_API_PORT=9000
+      - NIM_GRPC_API_PORT=50051
+      - NIM_DISABLE_GRPC_STARTUP=False
+      - NIM_TAGS_SELECTOR=name=parakeet-1-1b-ctc-en-us,mode=ofl,vad=silero
+    ports:
+      - "0.0.0.0:9000:9000"
+      - "0.0.0.0:50051:50051"
+    shm_size: '8gb'
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    profiles:
+      - parakeet
+
+  # ── Text-to-Speech: Wyoming Piper (ARM64 CPU) ───────────────────────────────
+  # Fast neural TTS (VITS). Wyoming protocol on :10200 for Home Assistant.
+  # Downloads voice model on first start (~50MB). CPU-only, no GPU needed.
+  wyoming-piper:
+    image: rhasspy/wyoming-piper:latest
+    container_name: wyoming-piper
+    ports:
+      - "0.0.0.0:10200:10200"
+    volumes:
+      - ~/.local/share/piper:/data
+    command: --voice en_US-lessac-medium --uri tcp://0.0.0.0:10200 --data-dir /data --download-dir /data
+    restart: unless-stopped
+    profiles:
+      - piper
