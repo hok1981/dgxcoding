@@ -10,8 +10,14 @@
 set -euo pipefail
 
 # ── Config ──────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 COMPOSE_FILE="$(cd "$(dirname "$0")/.." && pwd)/docker-compose.yml"
 RESULTS_FILE="$(cd "$(dirname "$0")/.." && pwd)/model_test_results.txt"
+PERF_SCRIPT="$SCRIPT_DIR/test_performance.py"
+
+# Performance test settings for LLM models
+PERF_RUNS=3        # iterations per model
+PERF_TOKENS=2048   # max completion tokens per run (~1-2 min per model at 40 tok/s)
 
 # Memory safety thresholds (MiB)
 MEM_WARN_FREE=15360     # 15 GB free  → print warning
@@ -85,7 +91,8 @@ ok()    { echo -e "${GREEN}[$(date '+%H:%M:%S')] OK:${RESET} $*"; }
 watchdog() {
   local container="$1"
   local min_free_file="/tmp/wdog_minfree_${container}"
-  local cur_min=999999
+  local cur_min
+  cur_min=$(mem_free_mib)   # seed with real value so fast-starting containers report correctly
   echo "$cur_min" > "$min_free_file"
 
   while true; do
@@ -214,31 +221,22 @@ test_model() {
   local infer_ok=false toks_per_sec="N/A"
 
   if [[ "$api_type" == "openai" ]]; then
-    local model_id
-    model_id=$(curl -sf "http://localhost:${port}/v1/models" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null || echo "unknown")
-    local response completion_tokens="0"
-    local infer_start infer_end infer_ms
-    infer_start=$(date +%s%3N)
-    if response=$(curl -sf --max-time 120 "http://localhost:${port}/v1/chat/completions" \
-      -H "Content-Type: application/json" \
-      -d "{
-        \"model\": \"${model_id}\",
-        \"messages\": [{\"role\": \"user\", \"content\": \"${TEST_PROMPT}\"}],
-        \"max_tokens\": 1024,
-        \"temperature\": 0
-      }" 2>&1); then
-      infer_end=$(date +%s%3N)
-      infer_ms=$(( infer_end - infer_start ))
-      local answer
-      answer=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])" 2>/dev/null || echo "(parse error)")
-      completion_tokens=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('usage',{}).get('completion_tokens',0))" 2>/dev/null || echo "0")
-      toks_per_sec=$(python3 -c "print(f'{${completion_tokens} / (${infer_ms} / 1000):.1f}')" 2>/dev/null || echo "N/A")
-      ok "Inference: ${infer_ms}ms — ${completion_tokens} tokens @ ${toks_per_sec} tok/s"
-      log "Response: ${answer}"
-      echo "RESPONSE [${name}]: ${answer}" >> "$RESULTS_FILE"
+    log "Running performance benchmark (${PERF_RUNS} runs × ${PERF_TOKENS} tokens)..."
+    local perf_json
+    if perf_json=$(python3 "$PERF_SCRIPT" "$port" \
+        --runs "$PERF_RUNS" --tokens "$PERF_TOKENS" --json 2>&1 \
+      | tail -1); then
+      local ttft decode_tps e2e_tps ctokens
+      ttft=$(echo    "$perf_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"ttft_s\"]:.2f}±{d[\"ttft_stdev\"]:.2f}')"   2>/dev/null || echo "N/A")
+      decode_tps=$(echo "$perf_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"decode_tps\"]:.1f}±{d[\"decode_stdev\"]:.1f}')" 2>/dev/null || echo "N/A")
+      e2e_tps=$(echo "$perf_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"e2e_tps\"]:.1f}')"    2>/dev/null || echo "N/A")
+      ctokens=$(echo "$perf_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(int(d['completion_tokens']))" 2>/dev/null || echo "0")
+      toks_per_sec=$(echo "$perf_json" | python3 -c "import sys,json; print(json.load(sys.stdin)['decode_tps'])" 2>/dev/null || echo "N/A")
+      ok "TTFT: ${ttft}s  |  decode: ${decode_tps} tok/s  |  e2e: ${e2e_tps} tok/s  |  ~${ctokens} tokens/run"
+      echo "PERF [${name}]: TTFT=${ttft}s decode=${decode_tps} tok/s e2e=${e2e_tps} tok/s tokens=${ctokens}" >> "$RESULTS_FILE"
       infer_ok=true
     else
-      error "Inference failed: $response"
+      error "Performance test failed"
     fi
 
   elif [[ "$api_type" == "nim-stt" ]]; then
@@ -345,9 +343,10 @@ print_summary() {
 
   echo -e "${BOLD}${bot}${RESET}"
   echo ""
-  echo "  RAM +GiB  = memory consumed by the model"
-  echo "  Peak GiB  = highest RAM usage during inference"
+  echo "  RAM +GiB  = memory consumed by the model at steady state"
+  echo "  Peak GiB  = highest RAM usage (includes inference spike)"
   echo "  Free GiB  = minimum free RAM seen (kill threshold: $(mib_to_gib $MEM_KILL_FREE) GiB)"
+  echo "  Perf      = decode tok/s, mean of ${PERF_RUNS} runs at ${PERF_TOKENS} tokens (LLMs) | CPU/N/A for STT/TTS"
   echo ""
   echo "Full results (with responses) saved to: $RESULTS_FILE"
 }

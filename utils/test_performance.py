@@ -113,28 +113,54 @@ def main():
     parser.add_argument("--runs", type=int, default=3, help="Number of iterations (default: 3)")
     parser.add_argument("--tokens", type=int, default=2048, help="Max completion tokens (default: 2048)")
     parser.add_argument("--prompt", default=DEFAULT_PROMPT)
+    parser.add_argument("--json", action="store_true", help="Output results as single JSON line (suppresses human output)")
     args = parser.parse_args()
 
     base_url = f"http://{args.host}:{args.port}"
 
-    print(f"Connecting to {base_url} ...")
+    if not args.json:
+        print(f"Connecting to {base_url} ...")
     try:
         model_id = get_model_id(base_url)
     except Exception as e:
-        print(f"ERROR: Could not reach model API — {e}")
+        print(f"ERROR: Could not reach model API — {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Model   : {model_id}")
-    print(f"Tokens  : up to {args.tokens}")
-    print(f"Runs    : {args.runs}")
-    print()
+    if not args.json:
+        print(f"Model   : {model_id}")
+        print(f"Tokens  : up to {args.tokens}")
+        print(f"Runs    : {args.runs}")
+        print()
 
     results = []
     for i in range(args.runs):
-        print(f"  Run {i+1}/{args.runs} ... ", end="", flush=True)
+        if not args.json:
+            print(f"  Run {i+1}/{args.runs} ... ", end="", flush=True)
+        else:
+            print(f"  run {i+1}/{args.runs}...", end="", flush=True, file=sys.stderr)
         r = run_once(base_url, model_id, args.prompt, args.tokens)
         results.append(r)
-        print(f"{r['completion_tokens']} tokens  |  TTFT {r['ttft_s']:.2f}s  |  decode {r['decode_tps']:.1f} tok/s")
+        if not args.json:
+            print(f"{r['completion_tokens']} tokens  |  TTFT {r['ttft_s']:.2f}s  |  decode {r['decode_tps']:.1f} tok/s")
+        else:
+            print(f" {r['decode_tps']:.1f} tok/s", file=sys.stderr)
+
+    if args.json:
+        import json as _json
+        def _mean(key): return statistics.mean(r[key] for r in results)
+        def _stdev(key): return statistics.stdev(r[key] for r in results) if len(results) > 1 else 0.0
+        print(_json.dumps({
+            "model": model_id,
+            "runs": args.runs,
+            "tokens": args.tokens,
+            "ttft_s": round(_mean("ttft_s"), 3),
+            "ttft_stdev": round(_stdev("ttft_s"), 3),
+            "decode_tps": round(_mean("decode_tps"), 1),
+            "decode_stdev": round(_stdev("decode_tps"), 1),
+            "e2e_tps": round(_mean("e2e_tps"), 1),
+            "completion_tokens": round(_mean("completion_tokens")),
+        }))
+        return
 
     print()
     print("=" * 60)
