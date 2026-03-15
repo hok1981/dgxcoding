@@ -194,7 +194,7 @@ services:
       - gptoss120b
 
   nemotron-nano:
-    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc7
     container_name: nemotron-nano
     runtime: nvidia
     environment:
@@ -226,7 +226,7 @@ services:
       - nemotronnano
 
   qwen35-35b:
-    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc7
     container_name: qwen35-35b
     runtime: nvidia
     environment:
@@ -258,9 +258,7 @@ services:
       - qwen3535b
 
   kimi-k25:
-    # NOTE: Kimi-K2.5 support requires TRT-LLM v1.3.0rc7+
-    # Update image once nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc7 is confirmed available
-    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc7
     container_name: kimi-k25
     runtime: nvidia
     environment:
