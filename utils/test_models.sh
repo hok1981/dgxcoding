@@ -34,6 +34,9 @@ ALL_MODELS=(
   "llama3370b|llama33-70b|8005|Llama-3.3-70B-Instruct-NVFP4"
   "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4"
   "kimi|kimi-k25|8008|Kimi-K2.5"
+  "gptoss120b|gpt-oss-120b|8006|gpt-oss-120b"
+  "nemotronnano|nemotron-nano|8009|Nemotron-3-Nano-30B-A3B-NVFP4"
+  "qwen3535b|qwen35-35b|8010|Qwen3.5-35B-A3B-FP8"
 )
 
 # ── Colors ───────────────────────────────────────────────────────────────────
@@ -313,6 +316,24 @@ main() {
     echo "========================================"
   } >> "$RESULTS_FILE"
 
+  # List mode
+  if [[ "${1:-}" == "--list" ]]; then
+    echo "Available models (pass profile name to test a single model):"
+    echo ""
+    printf "  %-16s  %-40s  %s\n" "PROFILE" "MODEL" "PORT"
+    printf "  %-16s  %-40s  %s\n" "-------" "-----" "----"
+    for entry in "${ALL_MODELS[@]}"; do
+      IFS='|' read -r profile _container port name <<< "$entry"
+      printf "  %-16s  %-40s  %s\n" "$profile" "$name" "$port"
+    done
+    echo ""
+    echo "Usage:"
+    echo "  ./utils/test_models.sh               # test all models"
+    echo "  ./utils/test_models.sh qwen3a3b      # test one model"
+    echo "  ./utils/test_models.sh qwen3a3b phi4 # test multiple models"
+    exit 0
+  fi
+
   # Determine which models to test
   local targets=()
   if [[ $# -gt 0 ]]; then
@@ -327,7 +348,7 @@ main() {
   fi
 
   if [[ ${#targets[@]} -eq 0 ]]; then
-    error "No matching models found. Valid profile names: qwen3a3b qwen332b phi4 llama3370b nemotron120b kimi"
+    error "No matching models found. Valid profile names: qwen3a3b qwen332b phi4 llama3370b nemotron120b kimi gptoss120b nemotronnano qwen3535b"
     exit 1
   fi
 

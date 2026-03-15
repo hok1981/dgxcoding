@@ -20,9 +20,11 @@ This project runs multiple LLMs on NVIDIA DGX Spark (Grace Blackwell ARM64) usin
 | qwen3-32b | nvidia/Qwen3-32B-NVFP4 | 8003 | qwen332b | 32B | Reasoning, quality |
 | phi4-reasoning | nvidia/Phi-4-reasoning-plus-NVFP4 | 8004 | phi4 | ~14B | Math, logic |
 | llama33-70b | nvidia/Llama-3.3-70B-Instruct-NVFP4 | 8005 | llama3370b | 70B | General purpose |
-| deepseek-v32 | nvidia/DeepSeek-V3.2-NVFP4 | 8006 | deepseek | ~37B | Coding |
-| nemotron-120b | nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 | 8007 | nemotron120b | 12B | Highest quality |
+| gpt-oss-120b | openai/gpt-oss-120b | 8006 | gptoss120b | ~120B MoE | Quality, fits ~80GB |
+| nemotron-120b | nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 | 8007 | nemotron120b | 12B | Highest quality (experimental) |
 | kimi-k25 | moonshotai/Kimi-K2.5 | 8008 | kimi | MoE | (pending TRT-LLM 1.3.x) |
+| nemotron-nano | nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4 | 8009 | nemotronnano | 3B | Fast MoE, agentic |
+| qwen35-35b | Qwen/Qwen3.5-35B-A3B-FP8 | 8010 | qwen3535b | 3B | Coding, fast MoE |
 
 ## File Structure
 

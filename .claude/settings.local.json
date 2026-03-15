@@ -25,7 +25,8 @@
       "WebFetch(domain:deepwiki.com)",
       "WebFetch(domain:community.home-assistant.io)",
       "WebFetch(domain:wiki.seeedstudio.com)",
-      "WebFetch(domain:www.xda-developers.com)"
+      "WebFetch(domain:www.xda-developers.com)",
+      "WebFetch(domain:spark-arena.com)"
     ]
   }
 }
