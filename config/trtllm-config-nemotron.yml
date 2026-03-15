@@ -1,10 +1,10 @@
 print_iter_log: false
 kv_cache_config:
   dtype: "auto"
-  # Higher fraction than default (0.70) per NVIDIA DGX Spark guidance for 120B models.
-  # Leaves less headroom but Nemotron steady-state is ~103 GiB (69.5 model + 33.6 KV cache)
-  # which fits in 128 GiB. Parallel weight loading is disabled via env var to prevent
-  # the startup memory spike that was causing OOM kills.
-  free_gpu_memory_fraction: 0.90
+  # Reduced from default 0.70 to prevent OOM. Measured weights ~60 GiB (120B × NVFP4).
+  # At 0.90 TRT-LLM pre-allocated 54 GiB KV cache → 114 GiB total → killed.
+  # At 0.50: weights (60) + KV cache (30) ≈ 90 GiB → ~30 GiB headroom on 119.7 GiB system.
+  # Parallel weight loading disabled via env var to prevent startup spike.
+  free_gpu_memory_fraction: 0.50
 cuda_graph_config:
   enable_padding: true
