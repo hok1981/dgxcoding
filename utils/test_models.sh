@@ -242,28 +242,40 @@ test_model() {
     fi
 
   elif [[ "$api_type" == "nim-stt" ]]; then
-    # Generate 0.5s of silence (8000 frames @ 16kHz) as a minimal WAV for transcription test
+    # Generate 1s of 440Hz sine wave @ 16kHz — VAD detects tone as audio (silence is rejected)
     python3 -c "
-import wave, io
+import wave, io, math, struct
 buf = io.BytesIO()
 with wave.open(buf, 'wb') as w:
     w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
-    w.writeframes(b'\x00' * 8000)
+    frames = [struct.pack('<h', int(16000 * math.sin(2*math.pi*440*i/16000))) for i in range(16000)]
+    w.writeframes(b''.join(frames))
 buf.seek(0)
 with open('/tmp/test_audio.wav', 'wb') as f:
     f.write(buf.read())" 2>/dev/null
-    local asr_response
-    if asr_response=$(curl -sf --max-time 60 \
+    # Get actual model ID from /v1/models if available, fallback to default
+    local nim_model
+    nim_model=$(curl -s --max-time 5 "http://localhost:${port}/v1/models" \
+      | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null \
+      || echo "parakeet-1-1b-ctc-en-us")
+    log "NIM model ID: ${nim_model}"
+    # POST audio — don't use -f so we always capture the response body for diagnostics
+    local http_code asr_response
+    asr_response=$(curl -s --max-time 60 -w "\n__HTTP_CODE__%{http_code}" \
       -X POST "http://localhost:${port}/v1/audio/transcriptions" \
       -F "file=@/tmp/test_audio.wav" \
-      -F "model=parakeet-1-1b-ctc-en-us" 2>&1); then
+      -F "model=${nim_model}" 2>&1)
+    http_code=$(echo "$asr_response" | grep -o '__HTTP_CODE__[0-9]*' | grep -o '[0-9]*')
+    asr_response=$(echo "$asr_response" | sed 's/__HTTP_CODE__[0-9]*//')
+    if [[ "$http_code" == "200" ]]; then
       local transcript
-      transcript=$(echo "$asr_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('text','(silence)'))" 2>/dev/null || echo "(silence)")
-      ok "Transcription succeeded: '${transcript}'"
-      echo "RESPONSE [${name}]: silence → '${transcript}'" >> "$RESULTS_FILE"
+      transcript=$(echo "$asr_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('text','(empty)'))" 2>/dev/null || echo "(empty)")
+      ok "Transcription succeeded (HTTP 200): '${transcript}'"
+      echo "RESPONSE [${name}]: tone → '${transcript}'" >> "$RESULTS_FILE"
       infer_ok=true
     else
-      error "Transcription failed: $asr_response"
+      error "Transcription failed (HTTP ${http_code}): ${asr_response}"
+      echo "RESPONSE [${name}]: FAILED HTTP ${http_code}: ${asr_response}" >> "$RESULTS_FILE"
     fi
 
   elif [[ "$api_type" == "wyoming-tts" ]]; then
