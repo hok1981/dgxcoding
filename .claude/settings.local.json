@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:hub.docker.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh api:*)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(i[''''number''''], i[''''title'''']\\) for i in data]\")",
+      "Bash(gh search:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh issue:*)",
+      "WebSearch",
+      "WebFetch(domain:build.nvidia.com)",
+      "WebFetch(domain:forums.developer.nvidia.com)",
+      "WebFetch(domain:catalog.ngc.nvidia.com)",
+      "WebFetch(domain:docs.nvidia.com)",
+      "WebFetch(domain:nvidia.github.io)",
+      "WebFetch(domain:developer.nvidia.com)"
+    ]
+  }
+}

@@ -9,7 +9,7 @@ echo ""
 echo "[1/5] Checking if container is running..."
 
 # Look for any of our model containers
-CONTAINER=$(docker ps --filter "name=qwen35-35b" --filter "name=qwen35-122b" --filter "name=deepseek-v32-speciale" --filter "name=kimi-k25" --filter "name=mimo-v2-flash" --format "{{.Names}}" | head -1)
+CONTAINER=$(docker ps --filter "name=qwen35-a3b" --filter "name=qwen35-a10b" --filter "name=deepseek-v32-speciale" --filter "name=kimi-k25" --format "{{.Names}}" | head -1)
 
 if [ -n "$CONTAINER" ]; then
     echo "✓ Container '$CONTAINER' is running"

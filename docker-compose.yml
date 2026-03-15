@@ -1,16 +1,17 @@
 services:
-  qwen35-35b:
-    image: vllm/vllm-openai:cu130-nightly
-    container_name: qwen35-35b
+  qwen35-a3b:
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
+    container_name: qwen35-a3b
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
-      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+      - MODEL_HANDLE=Qwen/Qwen3.5-35B-A3B
     ports:
       - "0.0.0.0:8002:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -24,32 +25,29 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      Qwen/Qwen3.5-35B-A3B
-      --served-model-name qwen3.5-35b
-      --port 8000
-      --host 0.0.0.0
-      --max-model-len 32768
-      --gpu-memory-utilization 0.65
-      --reasoning-parser qwen3
-      --enable-auto-tool-choice
-      --tool-call-parser qwen3_coder
-      --enable-prefix-caching
+      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
+        trtllm-serve "$MODEL_HANDLE"
+        --max_batch_size 32
+        --trust_remote_code
+        --port 8000
+        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
     restart: unless-stopped
     profiles:
-      - qwen35b
+      - qwen35a3b
 
-  qwen35-122b:
-    image: vllm/vllm-openai:cu130-nightly
-    container_name: qwen35-122b
+  qwen35-a10b:
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
+    container_name: qwen35-a10b
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
-      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+      - MODEL_HANDLE=Qwen/Qwen3.5-122B-A10B
     ports:
       - "0.0.0.0:8003:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -63,33 +61,29 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      Qwen/Qwen3.5-122B-A10B
-      --served-model-name qwen3.5-122b
-      --port 8000
-      --host 0.0.0.0
-      --max-model-len 16384
-      --max-num-batched-tokens 4096
-      --gpu-memory-utilization 0.60
-      --reasoning-parser qwen3
-      --enable-auto-tool-choice
-      --tool-call-parser qwen3_coder
-      --enable-prefix-caching
+      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
+        trtllm-serve "$MODEL_HANDLE"
+        --max_batch_size 16
+        --trust_remote_code
+        --port 8000
+        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
     restart: unless-stopped
     profiles:
-      - qwen122b
+      - qwen122a10b
 
   deepseek-v32-speciale:
-    image: vllm/vllm-openai:cu130-nightly
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
     container_name: deepseek-v32-speciale
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
-      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+      - MODEL_HANDLE=deepseek-ai/DeepSeek-V3.2-Speciale
     ports:
       - "0.0.0.0:8004:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -103,30 +97,31 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      deepseek-ai/DeepSeek-V3.2-Speciale
-      --served-model-name deepseek-v32-speciale
-      --port 8000
-      --host 0.0.0.0
-      --max-model-len 16384
-      --gpu-memory-utilization 0.60
-      --enable-prefix-caching
-      --trust-remote-code
+      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
+        trtllm-serve "$MODEL_HANDLE"
+        --max_batch_size 16
+        --trust_remote_code
+        --port 8000
+        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
     restart: unless-stopped
     profiles:
       - deepseek
 
   kimi-k25:
-    image: vllm/vllm-openai:cu130-nightly
+    # NOTE: Kimi-K2.5 support added in TRT-LLM v1.3.0rc7
+    # Update image to nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc7 once confirmed available on nvcr.io
+    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
     container_name: kimi-k25
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - HF_TOKEN=${HF_TOKEN}
-      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+      - MODEL_HANDLE=moonshotai/Kimi-K2.5
     ports:
       - "0.0.0.0:8005:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
     shm_size: '64gb'
     ipc: host
     ulimits:
@@ -140,54 +135,12 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      moonshotai/Kimi-K2.5
-      --served-model-name kimi-k25
-      --port 8000
-      --host 0.0.0.0
-      --max-model-len 16384
-      --gpu-memory-utilization 0.60
-      --enable-prefix-caching
-      --trust-remote-code
+      bash -c 'huggingface-cli download "$MODEL_HANDLE" &&
+        trtllm-serve "$MODEL_HANDLE"
+        --max_batch_size 16
+        --trust_remote_code
+        --port 8000
+        --extra_llm_api_options /tmp/extra-llm-api-config.yml'
     restart: unless-stopped
     profiles:
       - kimi
-
-  mimo-v2-flash:
-    image: vllm/vllm-openai:cu130-nightly
-    container_name: mimo-v2-flash
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - HF_TOKEN=${HF_TOKEN}
-      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
-    ports:
-      - "0.0.0.0:8006:8000"
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    shm_size: '64gb'
-    ipc: host
-    ulimits:
-      memlock: -1
-      stack: 67108864
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    command: >
-      XiaomiMiMo/MiMo-V2-Flash
-      --served-model-name mimo-v2-flash
-      --port 8000
-      --host 0.0.0.0
-      --max-model-len 16384
-      --max-num-batched-tokens 4096
-      --gpu-memory-utilization 0.60
-      --trust-remote-code
-      --generation-config vllm
-      --tool-call-parser qwen3_xml
-      --reasoning-parser qwen3
-    restart: unless-stopped
-    profiles:
-      - mimo

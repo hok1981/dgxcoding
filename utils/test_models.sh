@@ -28,11 +28,10 @@ TEST_PROMPT="Write a one-sentence summary of the Pythagorean theorem."
 
 # Models to test: "profile|container|port|name"
 ALL_MODELS=(
-  "qwen35b|qwen35-35b|8002|Qwen3.5-35B-A3B"
-  "qwen122b|qwen35-122b|8003|Qwen3.5-122B-A10B"
+  "qwen35a3b|qwen35-a3b|8002|Qwen3.5-35B-A3B"
+  "qwen122a10b|qwen35-a10b|8003|Qwen3.5-122B-A10B"
   "deepseek|deepseek-v32-speciale|8004|DeepSeek-V3.2-Speciale"
   "kimi|kimi-k25|8005|Kimi-K2.5"
-  "mimo|mimo-v2-flash|8006|MiMo-V2-Flash"
 )
 
 # ── Colors ───────────────────────────────────────────────────────────────────
@@ -123,7 +122,7 @@ test_model() {
       record_result "$name" "KILLED_BY_WATCHDOG" "$mem_before" "N/A" "N/A" "N/A"
       return
     fi
-    if curl -sf "http://localhost:${port}/health" > /dev/null 2>&1; then
+    if curl -sf "http://localhost:${port}/v1/models" > /dev/null 2>&1; then
       ready=true
       break
     fi
