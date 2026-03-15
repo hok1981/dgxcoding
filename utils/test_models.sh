@@ -253,12 +253,9 @@ with wave.open(buf, 'wb') as w:
 buf.seek(0)
 with open('/tmp/test_audio.wav', 'wb') as f:
     f.write(buf.read())" 2>/dev/null
-    # Get actual model ID from /v1/models if available, fallback to default
-    local nim_model
-    nim_model=$(curl -s --max-time 5 "http://localhost:${port}/v1/models" \
-      | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null \
-      || echo "parakeet-1-1b-ctc-en-us")
-    log "NIM model ID: ${nim_model}"
+    # /v1/audio/transcriptions uses the Riva model name, not the NIM container ID
+    local nim_model="parakeet-1-1b-ctc-riva"
+    log "NIM Riva model: ${nim_model}"
     # POST audio — don't use -f so we always capture the response body for diagnostics
     local http_code asr_response
     asr_response=$(curl -s --max-time 60 -w "\n__HTTP_CODE__%{http_code}" \
