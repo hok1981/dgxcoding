@@ -127,38 +127,6 @@ services:
     profiles:
       - llama3370b
 
-  deepseek-v32:
-    image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
-    container_name: deepseek-v32
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - HF_TOKEN=${HF_TOKEN}
-      - MODEL_HANDLE=nvidia/DeepSeek-V3.2-NVFP4
-      - MAX_BATCH_SIZE=8
-    ports:
-      - "0.0.0.0:8006:8000"
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
-      - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
-      - ./config/start_trtllm.sh:/start_trtllm.sh
-    shm_size: '64gb'
-    ipc: host
-    ulimits:
-      memlock: -1
-      stack: 67108864
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    command: bash /start_trtllm.sh
-    restart: unless-stopped
-    profiles:
-      - deepseek
-
   nemotron-120b:
     image: nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6
     container_name: nemotron-120b
@@ -168,11 +136,13 @@ services:
       - HF_TOKEN=${HF_TOKEN}
       - MODEL_HANDLE=nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
       - MAX_BATCH_SIZE=8
+      # Prevents memory spike during parallel weight loading (NVIDIA fix for OOM on 128GB)
+      - TRT_LLM_DISABLE_LOAD_WEIGHTS_IN_PARALLEL=1
     ports:
       - "0.0.0.0:8007:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
-      - ./config/trtllm-config.yml:/tmp/extra-llm-api-config.yml
+      - ./config/trtllm-config-nemotron.yml:/tmp/extra-llm-api-config.yml
       - ./config/start_trtllm.sh:/start_trtllm.sh
     shm_size: '64gb'
     ipc: host

@@ -18,7 +18,14 @@
       "WebFetch(domain:makerworld.com)",
       "WebFetch(domain:www.printables.com)",
       "WebFetch(domain:cults3d.com)",
-      "WebFetch(domain:www.seeedstudio.com)"
+      "WebFetch(domain:www.seeedstudio.com)",
+      "WebFetch(domain:blog.kubesimplify.com)",
+      "WebFetch(domain:kenhuangus.substack.com)",
+      "WebFetch(domain:apxml.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:community.home-assistant.io)",
+      "WebFetch(domain:wiki.seeedstudio.com)",
+      "WebFetch(domain:www.xda-developers.com)"
     ]
   }
 }

@@ -3,9 +3,9 @@
 #
 # Usage:
 #   ./utils/test_models.sh              # test all models
-#   ./utils/test_models.sh qwen35b      # test one model by profile name
+#   ./utils/test_models.sh qwen3a3b     # test one model by profile name
 #
-# Profile names: qwen35b, qwen122b, deepseek, kimi, mimo
+# Profile names: qwen3a3b, qwen332b, phi4, llama3370b, deepseek, nemotron120b, kimi
 
 set -euo pipefail
 
@@ -15,7 +15,7 @@ RESULTS_FILE="$(cd "$(dirname "$0")/.." && pwd)/model_test_results.txt"
 
 # Memory safety thresholds (MiB)
 MEM_WARN_FREE=15360     # 15 GB free  → print warning
-MEM_KILL_FREE=8192      #  8 GB free  → kill container immediately
+MEM_KILL_FREE=1024      #  1 GB free  → kill container immediately (swap is acceptable)
 
 # Startup timeout (seconds) — first run may need to download the model
 STARTUP_TIMEOUT=2400    # 40 minutes (large models like DeepSeek/Nemotron need extra time)
@@ -23,7 +23,7 @@ STARTUP_TIMEOUT=2400    # 40 minutes (large models like DeepSeek/Nemotron need e
 # Interval between memory samples (seconds)
 MONITOR_INTERVAL=5
 
-# Test prompt — append /no_think so reasoning models skip the <think> trace
+# Test prompt — /no_think suppresses reasoning traces on Qwen3/DeepSeek
 TEST_PROMPT="Write a one-sentence summary of the Pythagorean theorem. /no_think"
 
 # Models to test: "profile|container|port|name"
@@ -32,7 +32,6 @@ ALL_MODELS=(
   "qwen332b|qwen3-32b|8003|Qwen3-32B-NVFP4"
   "phi4|phi4-reasoning|8004|Phi-4-reasoning-plus-NVFP4"
   "llama3370b|llama33-70b|8005|Llama-3.3-70B-Instruct-NVFP4"
-  "deepseek|deepseek-v32|8006|DeepSeek-V3.2-NVFP4"
   "nemotron120b|nemotron-120b|8007|Nemotron-3-Super-120B-A12B-NVFP4"
   "kimi|kimi-k25|8008|Kimi-K2.5"
 )
@@ -62,26 +61,45 @@ gpu_mem_total_mib() {
   nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 || echo "N/A"
 }
 
-log() { echo -e "${CYAN}[$(date '+%H:%M:%S')]${RESET} $*"; }
-warn() { echo -e "${YELLOW}[$(date '+%H:%M:%S')] WARNING:${RESET} $*"; }
+mib_to_gib() {
+  # Print MiB value as GiB with one decimal, or return input unchanged if not numeric
+  local val="$1"
+  [[ "$val" =~ ^[0-9]+$ ]] && python3 -c "print(f'{${val}/1024:.1f}')" || echo "$val"
+}
+
+log()   { echo -e "${CYAN}[$(date '+%H:%M:%S')]${RESET} $*"; }
+warn()  { echo -e "${YELLOW}[$(date '+%H:%M:%S')] WARNING:${RESET} $*"; }
 error() { echo -e "${RED}[$(date '+%H:%M:%S')] ERROR:${RESET} $*"; }
-ok() { echo -e "${GREEN}[$(date '+%H:%M:%S')] OK:${RESET} $*"; }
+ok()    { echo -e "${GREEN}[$(date '+%H:%M:%S')] OK:${RESET} $*"; }
 
 # ── Safety watchdog (runs as background job) ─────────────────────────────────
+# Tracks minimum free RAM seen. Writes mem_used_at_kill to /tmp/watchdog_fired.
 watchdog() {
   local container="$1"
+  local min_free_file="/tmp/wdog_minfree_${container}"
+  local cur_min=999999
+  echo "$cur_min" > "$min_free_file"
+
   while true; do
     sleep "$MONITOR_INTERVAL"
-    local free
+    local free used
     free=$(mem_free_mib)
+    used=$(mem_used_mib)
+
+    # Track minimum free RAM seen
+    if (( free < cur_min )); then
+      cur_min=$free
+      echo "$cur_min" > "$min_free_file"
+    fi
+
     if (( free < MEM_KILL_FREE )); then
-      error "SAFETY KILL — only ${free} MiB free (threshold: ${MEM_KILL_FREE} MiB)"
-      error "Killing container $container NOW"
+      error "SAFETY KILL — only ${free} MiB ($(mib_to_gib $free) GiB) free  [threshold: $(mib_to_gib $MEM_KILL_FREE) GiB]"
+      error "RAM in use at kill: ${used} MiB ($(mib_to_gib $used) GiB)  |  min free seen: ${cur_min} MiB"
       docker kill "$container" 2>/dev/null || true
-      echo "KILLED_BY_WATCHDOG" > /tmp/watchdog_fired
+      echo "$used" > /tmp/watchdog_fired   # store mem_used so caller can compute delta
       return
     elif (( free < MEM_WARN_FREE )); then
-      warn "Low memory: ${free} MiB free (warn threshold: ${MEM_WARN_FREE} MiB)"
+      warn "Low memory: ${free} MiB ($(mib_to_gib $free) GiB) free  [warn: $(mib_to_gib $MEM_WARN_FREE) GiB, kill: $(mib_to_gib $MEM_KILL_FREE) GiB]"
     fi
   done
 }
@@ -98,13 +116,12 @@ test_model() {
 
   # Make sure no leftover container is running
   docker rm -f "$container" 2>/dev/null || true
-  rm -f /tmp/watchdog_fired
+  rm -f /tmp/watchdog_fired "/tmp/wdog_minfree_${container}"
 
-  local mem_before
+  local mem_before mem_free_before
   mem_before=$(mem_used_mib)
-  local gpu_before
-  gpu_before=$(gpu_mem_used_mib)
-  log "Memory before start: ${mem_before} MiB used, $(mem_free_mib) MiB free"
+  mem_free_before=$(mem_free_mib)
+  log "Memory before start: $(mib_to_gib $mem_before) GiB used, $(mib_to_gib $mem_free_before) GiB free (of $(mib_to_gib $(mem_total_mib)) GiB total)"
 
   # Start the container
   log "Starting container via profile '$profile'..."
@@ -114,45 +131,66 @@ test_model() {
   watchdog "$container" &
   local watchdog_pid=$!
 
-  # Wait for API to become ready
+  # Wait for API to become ready, logging memory growth every 30s
   log "Waiting for API to be ready (timeout: ${STARTUP_TIMEOUT}s)..."
   local elapsed=0
   local ready=false
+  local last_log_elapsed=-30   # force a log on first iteration
+
   while (( elapsed < STARTUP_TIMEOUT )); do
     if [[ -f /tmp/watchdog_fired ]]; then
-      error "Watchdog killed the container during startup!"
+      local killed_mem_used killed_delta min_free_seen
+      killed_mem_used=$(cat /tmp/watchdog_fired 2>/dev/null || echo "$mem_before")
+      killed_delta=$(( killed_mem_used - mem_before ))
+      min_free_seen=$(cat "/tmp/wdog_minfree_${container}" 2>/dev/null || echo "N/A")
+      error "Watchdog killed container at ${elapsed}s!"
+      error "  RAM consumed: +$(mib_to_gib $killed_delta) GiB  |  total in use: $(mib_to_gib $killed_mem_used) GiB  |  min free: $(mib_to_gib $min_free_seen) GiB"
+      error "  System has $(mib_to_gib $(mem_total_mib)) GiB total — model needed > $(mib_to_gib $killed_delta) GiB"
       kill "$watchdog_pid" 2>/dev/null || true
-      record_result "$name" "KILLED_BY_WATCHDOG" "$mem_before" "N/A" "N/A" "N/A"
+      record_result "$name" "KILLED_BY_WATCHDOG" "$mem_before" "$killed_mem_used" "$killed_mem_used" "N/A" "N/A" "$min_free_seen"
       return
     fi
+
     if curl -sf "http://localhost:${port}/v1/models" > /dev/null 2>&1; then
       ready=true
       break
     fi
+
     sleep 10
     elapsed=$(( elapsed + 10 ))
-    log "  Still waiting... (${elapsed}s elapsed, $(mem_free_mib) MiB free)"
+
+    # Log memory progress every 30s
+    if (( elapsed - last_log_elapsed >= 30 )); then
+      local cur_used cur_delta cur_free
+      cur_used=$(mem_used_mib)
+      cur_delta=$(( cur_used - mem_before ))
+      cur_free=$(mem_free_mib)
+      log "  ${elapsed}s — RAM: +$(mib_to_gib $cur_delta) GiB loaded, $(mib_to_gib $cur_free) GiB free remaining"
+      last_log_elapsed=$elapsed
+    fi
   done
 
   if [[ "$ready" != "true" ]]; then
-    error "Timed out waiting for $name to become ready"
+    local min_free_seen
+    min_free_seen=$(cat "/tmp/wdog_minfree_${container}" 2>/dev/null || echo "N/A")
+    error "Timed out waiting for $name to become ready (${STARTUP_TIMEOUT}s)"
+    log "  Min free RAM seen during startup: $(mib_to_gib $min_free_seen) GiB"
     kill "$watchdog_pid" 2>/dev/null || true
     docker logs --tail 20 "$container" 2>&1 | sed 's/^/    /'
     docker rm -f "$container" 2>/dev/null || true
-    record_result "$name" "TIMEOUT" "$mem_before" "N/A" "N/A" "N/A"
+    record_result "$name" "TIMEOUT" "$mem_before" "N/A" "N/A" "N/A" "N/A" "$min_free_seen"
     return
   fi
 
   ok "API is ready after ${elapsed}s"
 
   # Sample memory at steady state
-  local mem_loaded
+  local mem_loaded gpu_loaded mem_delta min_free_seen
   mem_loaded=$(mem_used_mib)
-  local gpu_loaded
   gpu_loaded=$(gpu_mem_used_mib)
-  local mem_delta=$(( mem_loaded - mem_before ))
-  log "Memory after load: ${mem_loaded} MiB used (+${mem_delta} MiB),  $(mem_free_mib) MiB free"
-  log "GPU memory: ${gpu_loaded} MiB / $(gpu_mem_total_mib) MiB"
+  mem_delta=$(( mem_loaded - mem_before ))
+  min_free_seen=$(cat "/tmp/wdog_minfree_${container}" 2>/dev/null || echo "N/A")
+  log "Loaded: +$(mib_to_gib $mem_delta) GiB RAM  |  GPU: ${gpu_loaded} MiB / $(gpu_mem_total_mib) MiB  |  min free: $(mib_to_gib $min_free_seen) GiB"
 
   # Run test inference
   log "Running test inference..."
@@ -176,8 +214,8 @@ test_model() {
     answer=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])" 2>/dev/null || echo "(parse error)")
     completion_tokens=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('usage',{}).get('completion_tokens',0))" 2>/dev/null || echo "0")
     toks_per_sec=$(python3 -c "print(f'{${completion_tokens} / (${infer_ms} / 1000):.1f}')" 2>/dev/null || echo "N/A")
-    ok "Inference succeeded in ${infer_ms}ms — ${completion_tokens} tokens @ ${toks_per_sec} tok/s"
-    log "Response:\n${answer}"
+    ok "Inference: ${infer_ms}ms — ${completion_tokens} tokens @ ${toks_per_sec} tok/s"
+    log "Response: ${answer}"
     echo "RESPONSE [${name}]: ${answer}" >> "$RESULTS_FILE"
     infer_ok=true
   else
@@ -185,9 +223,8 @@ test_model() {
   fi
 
   # Peak memory after inference
-  local mem_peak
+  local mem_peak gpu_peak
   mem_peak=$(mem_used_mib)
-  local gpu_peak
   gpu_peak=$(gpu_mem_used_mib)
 
   # Stop watchdog and container
@@ -202,21 +239,59 @@ test_model() {
   while (( $(mem_used_mib) > mem_before + 2048 && wait < 60 )); do
     sleep 5; wait=$(( wait + 5 ))
   done
-  log "Memory after stop: $(mem_used_mib) MiB used, $(mem_free_mib) MiB free"
+  log "Memory after stop: $(mib_to_gib $(mem_used_mib)) GiB used, $(mib_to_gib $(mem_free_mib)) GiB free"
 
   local status="OK"
   [[ "$infer_ok" != "true" ]] && status="LOADED_NO_INFER"
-  record_result "$name" "$status" "$mem_before" "$mem_loaded" "$mem_peak" "$gpu_peak" "$toks_per_sec"
+  record_result "$name" "$status" "$mem_before" "$mem_loaded" "$mem_peak" "$gpu_peak" "$toks_per_sec" "$min_free_seen"
 }
 
+# ── Record result as TSV (tab-separated) for clean table parsing ──────────────
+# Fields: name, status, ram_delta_mib, ram_peak_mib, gpu_peak_mib, toks_per_sec, min_free_mib
 record_result() {
-  local name="$1" status="$2" mem_before="$3" mem_loaded="$4" mem_peak="$5" gpu_peak="$6" toks_per_sec="${7:-N/A}"
+  local name="$1" status="$2" mem_before="$3" mem_loaded="$4" mem_peak="$5" \
+        gpu_peak="$6" toks_per_sec="${7:-N/A}" min_free="${8:-N/A}"
   local delta="N/A"
-  [[ "$mem_loaded" != "N/A" && "$mem_before" != "N/A" ]] && delta=$(( mem_loaded - mem_before ))
+  [[ "$mem_loaded" != "N/A" && "$mem_before" =~ ^[0-9]+$ && "$mem_loaded" =~ ^[0-9]+$ ]] \
+    && delta=$(( mem_loaded - mem_before ))
 
-  printf "RESULT| %-38s | %-18s | %6s MiB | %6s MiB | %6s MiB | %s tok/s\n" \
-    "$name" "$status" "$delta" "$mem_peak" "$gpu_peak" "$toks_per_sec" \
+  printf "RESULT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+    "$name" "$status" "$delta" "$mem_peak" "$gpu_peak" "$toks_per_sec" "$min_free" \
     >> "$RESULTS_FILE"
+}
+
+# ── Print summary table ───────────────────────────────────────────────────────
+print_summary() {
+  local count="$1"
+  local sep="╠══════════════════════════════════╪══════════════════════╪═════════╪═════════╪═════════╪════════╣"
+  local top="╔══════════════════════════════════╤══════════════════════╤═════════╤═════════╤═════════╤════════╗"
+  local bot="╚══════════════════════════════════╧══════════════════════╧═════════╧═════════╧═════════╧════════╝"
+  local hdr="╠══════════════════════════════════╪══════════════════════╪═════════╪═════════╪═════════╪════════╣"
+
+  echo ""
+  echo -e "${BOLD}${top}${RESET}"
+  printf "${BOLD}║ %-32s │ %-20s │ %7s │ %7s │ %7s │ %6s ║${RESET}\n" \
+    "Model" "Status" "RAM +GiB" "Peak GiB" "Free GiB" "tok/s"
+  echo -e "${BOLD}${hdr}${RESET}"
+
+  while IFS=$'\t' read -r _ name status delta peak _gpu toks minfree; do
+    local delta_g peak_g free_g
+    delta_g=$(mib_to_gib "$delta")
+    peak_g=$(mib_to_gib "$peak")
+    free_g=$(mib_to_gib "$minfree")
+    # Truncate name to 32 chars
+    name="${name:0:32}"
+    printf "║ %-32s │ %-20s │ %7s │ %7s │ %7s │ %6s ║\n" \
+      "$name" "$status" "$delta_g" "$peak_g" "$free_g" "$toks"
+  done < <(grep "^RESULT" "$RESULTS_FILE" | tail -"$count")
+
+  echo -e "${BOLD}${bot}${RESET}"
+  echo ""
+  echo "  RAM +GiB  = memory consumed by the model"
+  echo "  Peak GiB  = highest RAM usage during inference"
+  echo "  Free GiB  = minimum free RAM seen (kill threshold: $(mib_to_gib $MEM_KILL_FREE) GiB)"
+  echo ""
+  echo "Full results (with responses) saved to: $RESULTS_FILE"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -224,11 +299,8 @@ main() {
   echo -e "${BOLD}Model Memory Test Suite${RESET}"
   echo "Results will be saved to: $RESULTS_FILE"
   echo ""
-  echo "Safety thresholds:"
-  echo "  Warn at:  $(( MEM_WARN_FREE / 1024 )) GB free"
-  echo "  Kill at:  $(( MEM_KILL_FREE / 1024 )) GB free"
-  echo ""
-  echo "System: $(mem_total_mib) MiB total, $(mem_free_mib) MiB free at start"
+  echo "Safety thresholds:  warn < $(mib_to_gib $MEM_WARN_FREE) GiB free  |  kill < $(mib_to_gib $MEM_KILL_FREE) GiB free"
+  echo "System: $(mib_to_gib $(mem_total_mib)) GiB total, $(mib_to_gib $(mem_free_mib)) GiB free at start"
   echo "GPU:    $(gpu_mem_total_mib) MiB total, $(gpu_mem_used_mib) MiB used at start"
   echo ""
 
@@ -244,7 +316,6 @@ main() {
   # Determine which models to test
   local targets=()
   if [[ $# -gt 0 ]]; then
-    # Filter to requested profiles
     for entry in "${ALL_MODELS[@]}"; do
       local profile="${entry%%|*}"
       for arg in "$@"; do
@@ -256,7 +327,7 @@ main() {
   fi
 
   if [[ ${#targets[@]} -eq 0 ]]; then
-    error "No matching models found. Valid profile names: qwen3a3b qwen332b phi4 llama3370b deepseek nemotron120b kimi"
+    error "No matching models found. Valid profile names: qwen3a3b qwen332b phi4 llama3370b nemotron120b kimi"
     exit 1
   fi
 
@@ -265,20 +336,7 @@ main() {
     test_model "$profile" "$container" "$port" "$name"
   done
 
-  echo ""
-  echo -e "${BOLD}╔══════════════════════════════════════════════════════════════════════════════════╗${RESET}"
-  echo -e "${BOLD}║                              RESULTS SUMMARY                                    ║${RESET}"
-  echo -e "${BOLD}╠══════════════════════════════╦════════════════════╦══════════╦══════════╦════════╣${RESET}"
-  printf "${BOLD}║ %-28s ║ %-18s ║ %8s ║ %8s ║ %6s ║${RESET}\n" \
-    "Model" "Status" "RAM +MiB" "RAM peak" "tok/s"
-  echo -e "${BOLD}╠══════════════════════════════╬════════════════════╬══════════╬══════════╬════════╣${RESET}"
-  while IFS='|' read -r _ name status delta peak _gpu toks; do
-    printf "║ %-28s ║ %-18s ║ %8s ║ %8s ║ %6s ║\n" \
-      "${name// /}" "${status// /}" "${delta// /}" "${peak// /}" "${toks// /}"
-  done < <(grep "^RESULT|" "$RESULTS_FILE" | tail -"${#targets[@]}")
-  echo -e "${BOLD}╚══════════════════════════════╩════════════════════╩══════════╩══════════╩════════╝${RESET}"
-  echo ""
-  echo "Full results (with responses) saved to: $RESULTS_FILE"
+  print_summary "${#targets[@]}"
 }
 
 main "$@"
