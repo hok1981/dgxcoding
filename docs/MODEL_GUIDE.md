@@ -1,238 +1,221 @@
-# Qwen3.5 Model Guide for DGX Spark
+# Model Guide — DGX Spark
 
-## Model Overview
+All models run via TRT-LLM (`nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6`) in NVFP4
+quantization on the GB10 Blackwell GPU. NVFP4 gives ~3.5x memory reduction vs BF16
+and ~65% higher tok/s by activating Blackwell-native tensor cores.
 
-### Qwen3.5-35B-A3B ⭐ (Recommended)
+---
 
-**Architecture:**
-- Total Parameters: 35B
-- Active Parameters: 3B per token (MoE)
-- Experts: 64 routed + 1 shared
-- Hybrid Attention: Gated Delta Networks + Full Attention every 4th layer
+## Quick Comparison
 
-**Memory Requirements:**
+| Model | Type | Active Params | Port | Profile | Best For |
+|---|---|---|---|---|---|
+| Qwen3-30B-A3B-NVFP4 | MoE | 3B | 8002 | `qwen3a3b` | Fast general purpose, coding |
+| Qwen3-32B-NVFP4 | Dense | 32B | 8003 | `qwen332b` | Deep reasoning, complex tasks |
+| Phi-4-reasoning-plus-NVFP4 | Dense | ~14B | 8004 | `phi4` | Math, logic, low latency |
+| Llama-3.3-70B-Instruct-NVFP4 | Dense | 70B | 8005 | `llama3370b` | General purpose, widest compat |
+| DeepSeek-V3.2-NVFP4 | MoE | ~37B | 8006 | `deepseek` | Coding, technical, math |
+| Nemotron-3-Super-120B-A12B-NVFP4 | MoE | 12B | 8007 | `nemotron120b` | Highest quality ceiling |
+| Kimi-K2.5 | MoE | — | 8008 | `kimi` | Long context ⚠️ pending TRT-LLM 1.3.x |
+
+---
+
+## Model Details
+
+### Qwen3-30B-A3B-NVFP4
+**Publisher:** Alibaba (NVIDIA NVFP4 quant)
+**Architecture:** Mixture of Experts — 30B total, **3B active per token**
+
+**Strengths:**
+- Fastest model in the lineup — low active parameter count means high tok/s
+- Best multilingual capability (Alibaba-trained, strong non-English)
+- Good coding and instruction following
+- Very memory-efficient — fits easily even at long contexts
+
+**Weaknesses:**
+- MoE routing adds overhead at very low batch sizes
+- Shallower reasoning than dense models of similar "size"
+
+**Recommended for:** High-throughput workloads, interactive coding assistant,
+multilingual tasks, default everyday model.
+
+---
+
+### Qwen3-32B-NVFP4
+**Publisher:** Alibaba (NVIDIA NVFP4 quant)
+**Architecture:** Dense — **32B active per token**
+
+**Strengths:**
+- All 32B parameters contribute to every token — deeper reasoning than A3B
+- More consistent output quality (no MoE routing variability)
+- Strong at multi-step logic, structured output, and complex code
+
+**Weaknesses:**
+- Slower than A3B (higher compute per token)
+- Higher memory bandwidth usage
+
+**Recommended for:** Complex reasoning chains, tasks where output quality
+matters more than throughput, A/B comparison against the A3B variant.
+
+---
+
+### Phi-4-reasoning-plus-NVFP4
+**Publisher:** Microsoft (NVIDIA NVFP4 quant)
+**Architecture:** Dense — ~**14B active parameters**
+
+**Strengths:**
+- Smallest and fastest model — very low first-token latency
+- Specifically fine-tuned for chain-of-thought reasoning
+- Exceptional at math, logic puzzles, and structured problem solving
+- Punches well above its weight class on reasoning benchmarks
+
+**Weaknesses:**
+- Smaller knowledge base than 30B+ models
+- Can struggle with open-ended creative or knowledge-heavy tasks
+- Less capable at very long context tasks
+
+**Recommended for:** Math problems, logic tasks, structured output generation,
+fast prototyping, latency-sensitive applications.
+
+---
+
+### Llama-3.3-70B-Instruct-NVFP4
+**Publisher:** Meta (NVIDIA NVFP4 quant)
+**Architecture:** Dense — **70B active parameters**
+
+**Strengths:**
+- Most widely benchmarked model — well-understood behaviour
+- Largest ecosystem: most evals, tools, and fine-tunes target Llama
+- Excellent general-purpose instruction following
+- Strong at writing, summarization, and analysis
+
+**Weaknesses:**
+- Highest compute and memory cost of the dense models
+- Lower tok/s than MoE models in the same quality tier
+- No specialisation — DeepSeek beats it at coding, Phi-4 at math
+
+**Recommended for:** General assistant tasks, writing, summarization,
+production baseline, when you need well-known benchmark characteristics.
+
+---
+
+### DeepSeek-V3.2-NVFP4
+**Publisher:** DeepSeek (NVIDIA NVFP4 quant)
+**Architecture:** Mixture of Experts — ~671B total, **~37B active per token**
+
+**Strengths:**
+- State-of-the-art coding — consistently tops coding benchmarks
+- Excellent at algorithms, math, and technical problem solving
+- MoE efficiency gives solid tok/s despite large total parameter count
+- Strong at multi-file reasoning, refactoring, and debugging
+
+**Weaknesses:**
+- Largest download in the lineup
+- Can be verbose and over-engineer simple solutions
+- Less strong at open-ended creative writing
+
+**Recommended for:** Code generation, code review, debugging, algorithm
+design, any task where correctness and technical depth matter most.
+
+---
+
+### Nemotron-3-Super-120B-A12B-NVFP4
+**Publisher:** NVIDIA
+**Architecture:** Mixture of Experts — 120B total, **12B active per token**
+
+**Strengths:**
+- NVIDIA's own flagship — optimised and tested on DGX Spark hardware
+- Used internally as a teacher model for distillation (highest quality ceiling)
+- Strong instruction following and enterprise-grade reliability
+- MoE efficiency keeps tok/s reasonable despite 120B total params
+- Officially supported and benchmarked on this exact hardware
+
+**Weaknesses:**
+- Less community benchmarking than Llama or DeepSeek
+- Fewer fine-tunes and third-party tools built around it
+- Large total parameter download
+
+**Recommended for:** Tasks requiring maximum quality, enterprise workloads,
+NVIDIA's own recommended model for this hardware.
+
+---
+
+### Kimi-K2.5 ⚠️ Pending
+**Publisher:** Moonshot AI
+**Architecture:** MoE
+**Status:** Requires TRT-LLM v1.3.0rc7+ — check nvcr.io for availability
+
+**Strengths:**
+- Extremely long context window (128K+ tokens natively)
+- Strong at document analysis and long-form reasoning
+- Good multilingual capability
+
+**Weaknesses:**
+- Least battle-tested of the lineup on DGX Spark
+- TRT-LLM support only just added in v1.3.0rc7
+
+**Recommended for:** Long document summarisation, multi-document Q&A,
+tasks that exceed the 32K context of other models.
+
+---
+
+## Choosing a Model
+
 ```
-System/OS:      ~15 GB
-Model (BF16):   ~63 GB
-KV Cache:       ~35 GB (131K context)
-CUDA Overhead:  ~5 GB
-Free:           ~10 GB
-─────────────────────────
-Total:          ~118 GB / 128 GB
+Need fast responses?           → Phi-4-reasoning-plus or Qwen3-30B-A3B
+Writing code?                  → DeepSeek-V3.2 > Qwen3-32B > Llama-3.3-70B
+Math / logic?                  → Phi-4-reasoning-plus > DeepSeek-V3.2
+General assistant?             → Llama-3.3-70B or Qwen3-30B-A3B
+Highest quality ceiling?       → Nemotron-120B or DeepSeek-V3.2
+Long documents (>32K tokens)?  → Kimi-K2.5 (when available)
+Multilingual?                  → Qwen3-30B-A3B or Qwen3-32B
 ```
 
-**Performance on DGX Spark:**
-- Speed: ~30 tok/s (BF16)
-- Context: 131K tokens (can extend to 256K)
-- Memory bandwidth limited: ~273 GB/s LPDDR5X
+---
 
-**Best For:**
-- Fast inference with strong capabilities
-- Production deployments
-- Multi-turn conversations
-- Tool calling and agentic tasks
-
-### Qwen3.5-122B-A10B
-
-**Architecture:**
-- Total Parameters: 122B
-- Active Parameters: 10B per token (MoE)
-- Experts: 64 routed + 1 shared
-- Hybrid Attention: Same as 35B
-
-**Memory Requirements (FP4 Quantized):**
-```
-System/OS:      ~15 GB
-Model (FP4):    ~75 GB
-KV Cache:       ~25 GB (65K context)
-CUDA Overhead:  ~5 GB
-Free:           ~8 GB
-─────────────────────────
-Total:          ~120 GB / 128 GB
-```
-
-**Performance on DGX Spark:**
-- Speed: ~15 tok/s (FP4)
-- Context: 65K tokens (reduced for memory)
-- Requires `--quantization modelopt_fp4`
-
-**Best For:**
-- Maximum quality
-- Complex reasoning tasks
-- When speed is less critical
-
-**Note:** FP4 quantization support is still maturing. For production, use 35B model.
-
-### Qwen3.5-27B (Dense)
-
-**Not recommended for DGX Spark** - Dense models are less efficient than MoE on this hardware. Use 35B-A3B instead.
-
-## Architecture Details
-
-### Hybrid Attention
-
-Qwen3.5 uses a novel hybrid approach:
-- **Gated Delta Networks (GDN)**: Linear attention (O(n) complexity) for 3 out of 4 layers
-- **Full Attention**: Standard multi-head attention every 4th layer for associative recall
-- Result: Near-linear scaling with context length while maintaining quality
-
-### Mixture of Experts (MoE)
-
-- **64 Routed Experts**: Top-8 activated per token
-- **1 Shared Expert**: Always active for universal features
-- **Efficiency**: Only ~3B or ~10B parameters active per forward pass
-
-### Multimodal Support
-
-- DeepStack Vision Transformer with Conv3d
-- Native image and video understanding
-- Supports vision-language tasks
-
-## Configuration Flags
-
-### Essential Flags
+## Starting a Model
 
 ```bash
---attention-backend triton        # Required for DGX Spark (ARM64 + GB10)
---trust-remote-code              # Required for Qwen models
---reasoning-parser qwen3         # Enable thinking/reasoning mode
---tool-call-parser qwen3_coder   # Enable tool calling
+# Start one model
+docker compose --profile <profile> up -d
+
+# Stop it
+docker compose --profile <profile> down
+
+# Check status
+bash utils/check_status.sh
+
+# Run inference test on all models sequentially
+bash utils/test_models.sh
+
+# Test specific models
+bash utils/test_models.sh qwen3a3b deepseek phi4
 ```
 
-### Memory Management
+---
 
-```bash
---mem-fraction-static 0.7        # Reserve 70% for model/KV cache
---context-length 131072          # 131K context (35B model)
---context-length 65536           # 65K context (122B model)
-```
+## Performance Notes
 
-### Performance Tuning
+All figures are approximate on DGX Spark (GB10, 128GB unified memory, 273 GB/s bandwidth).
 
-```bash
---tp-size 1                      # Tensor parallelism (1 GPU)
---watchdog-timeout 1200          # Increase for large models
-```
+| Model | Expected tok/s (NVFP4) |
+|---|---|
+| Phi-4-reasoning-plus | ~100–120 |
+| Qwen3-30B-A3B | ~70–80 |
+| Qwen3-32B | ~50–60 |
+| Llama-3.3-70B | ~35–45 |
+| DeepSeek-V3.2 | ~30–40 |
+| Nemotron-120B | ~40–50 |
 
-## Reasoning Modes
+Memory bandwidth is the primary bottleneck on DGX Spark. NVFP4 reduces
+weight size by ~3.5x, which directly multiplies throughput vs BF16.
 
-### Thinking Mode (Reasoning)
+---
 
-Enable with `--reasoning-parser qwen3`. The model generates `<think>` blocks:
+## Why NVFP4 + TRT-LLM
 
-```json
-{
-  "temperature": 1.0,
-  "top_p": 0.95,
-  "top_k": 20,
-  "presence_penalty": 1.5
-}
-```
-
-**Best for:** Complex reasoning, math, logic problems
-
-### Non-Thinking Mode (Fast)
-
-Default mode without thinking blocks:
-
-```json
-{
-  "temperature": 0.7,
-  "top_p": 0.8,
-  "top_k": 20,
-  "presence_penalty": 1.5
-}
-```
-
-**Best for:** Chat, code generation, quick responses
-
-## Tool Calling
-
-Enable with `--tool-call-parser qwen3_coder`. Supports:
-- Function definitions
-- Parallel tool calls
-- Tool execution results
-- Multi-turn tool interactions
-
-Example:
-```python
-response = requests.post('http://localhost:8001/v1/chat/completions', json={
-    'model': 'Qwen/Qwen3.5-35B-A3B',
-    'messages': [...],
-    'tools': [
-        {
-            'type': 'function',
-            'function': {
-                'name': 'get_weather',
-                'description': 'Get weather for a location',
-                'parameters': {...}
-            }
-        }
-    ]
-})
-```
-
-## Performance Benchmarks
-
-### DGX Spark (GB10, 128GB Unified Memory)
-
-| Model | Precision | Speed | Memory | Context |
-|-------|-----------|-------|--------|---------|
-| 35B-A3B | BF16 | ~30 tok/s | 118GB | 131K |
-| 35B-A3B | FP8 | ~50 tok/s | 80GB | 131K |
-| 122B-A10B | FP4 | ~15 tok/s | 120GB | 65K |
-
-**Note:** FP8 support requires additional setup. BF16 is recommended for stability.
-
-## Memory Bandwidth Limitation
-
-DGX Spark uses LPDDR5X with ~273 GB/s bandwidth. This is the bottleneck for inference speed, not compute. The ~30 tok/s for 35B-A3B BF16 is near the theoretical ceiling.
-
-For higher throughput:
-- Use quantized models (FP8/FP4)
-- Reduce context length
-- Use smaller batch sizes
-
-## Model Selection Guide
-
-**Choose Qwen3.5-35B-A3B if:**
-- You want the best balance of speed and quality
-- Running production workloads
-- Need reliable, stable inference
-- Memory efficiency matters
-
-**Choose Qwen3.5-122B-A10B if:**
-- You need maximum quality
-- Speed is less critical
-- Willing to use experimental FP4 quantization
-- Complex reasoning tasks
-
-**Avoid Qwen3.5-27B because:**
-- Dense models are less efficient than MoE on this hardware
-- 35B-A3B is faster and often better quality
-
-## Supported Languages
-
-- **Programming**: 358 languages (Python, JavaScript, Go, Rust, etc.)
-- **Natural**: 201 languages and dialects
-
-## Context Window
-
-- **Native**: 256K tokens
-- **Recommended**: 131K tokens (35B), 65K tokens (122B)
-- **Extendable**: Up to 1M with YaRN (experimental)
-
-## API Compatibility
-
-Qwen3.5 with SGLang provides:
-- **OpenAI-compatible API**: `/v1/chat/completions`, `/v1/completions`
-- **Anthropic-compatible API**: Native support for Claude Code
-- **Streaming**: Server-Sent Events (SSE)
-- **Tool calling**: Function calling support
-
-## Links
-
-- [Qwen3.5 GitHub](https://github.com/QwenLM/Qwen3.5)
-- [Qwen3.5 Blog](https://qwen.ai/blog?id=qwen3.5)
-- [SGLang Documentation](https://docs.sglang.io/)
-- [DGX Spark Playbooks](https://github.com/NVIDIA/dgx-spark-playbooks)
+- **NVFP4** is a Blackwell-native 4-bit floating point format — activates
+  dedicated tensor cores unavailable to older quantisation formats
+- **TRT-LLM** is NVIDIA's officially supported inference runtime for DGX Spark,
+  compiled natively for SM121 (no PTX JIT fallback)
+- Together they give the best performance achievable on this hardware

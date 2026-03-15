@@ -18,13 +18,13 @@ MEM_WARN_FREE=15360     # 15 GB free  → print warning
 MEM_KILL_FREE=8192      #  8 GB free  → kill container immediately
 
 # Startup timeout (seconds) — first run may need to download the model
-STARTUP_TIMEOUT=1200    # 20 minutes
+STARTUP_TIMEOUT=2400    # 40 minutes (large models like DeepSeek/Nemotron need extra time)
 
 # Interval between memory samples (seconds)
 MONITOR_INTERVAL=5
 
-# Test prompt
-TEST_PROMPT="Write a one-sentence summary of the Pythagorean theorem."
+# Test prompt — append /no_think so reasoning models skip the <think> trace
+TEST_PROMPT="Write a one-sentence summary of the Pythagorean theorem. /no_think"
 
 # Models to test: "profile|container|port|name"
 ALL_MODELS=(
@@ -167,7 +167,7 @@ test_model() {
     -d "{
       \"model\": \"${model_id}\",
       \"messages\": [{\"role\": \"user\", \"content\": \"${TEST_PROMPT}\"}],
-      \"max_tokens\": 512,
+      \"max_tokens\": 1024,
       \"temperature\": 0
     }" 2>&1); then
     infer_end=$(date +%s%3N)

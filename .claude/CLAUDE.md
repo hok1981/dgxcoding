@@ -2,149 +2,202 @@
 
 ## Project Overview
 
-This project runs Qwen3.5 models on NVIDIA DGX Spark (Grace Blackwell ARM64) using vLLM in Docker, with remote access for Claude Code.
+This project runs multiple LLMs on NVIDIA DGX Spark (Grace Blackwell ARM64) using **TensorRT-LLM** in Docker, with OpenAI-compatible API for Claude Code integration. It also hosts a growing **projects/** directory for AI applications built on top of these models.
 
 ## Architecture
 
 - **Hardware**: DGX Spark (ARM64, 128GB unified memory, Blackwell GB10 GPU)
-- **Container**: `vllm/vllm-openai:cu130-nightly` (ARM64 with Qwen3.5 support)
-- **Models**: Qwen3.5-35B-A3B (primary), Qwen3.5-122B-A10B (optional)
-- **API**: OpenAI-compatible (Claude Code integration)
+- **Runtime**: TensorRT-LLM 1.2.0rc6 (`nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6`)
+- **Quantization**: NVFP4 (Blackwell-native 4-bit float, very fast)
+- **API**: OpenAI-compatible at each model's port
+- **Model cache**: `~/.cache/huggingface` shared across containers
+
+## Available Models
+
+| Service | Model | Port | Profile | Active Params | Best For |
+|---------|-------|------|---------|--------------|----------|
+| qwen3-a3b | nvidia/Qwen3-30B-A3B-NVFP4 | 8002 | qwen3a3b | 3B | Speed, daily use |
+| qwen3-32b | nvidia/Qwen3-32B-NVFP4 | 8003 | qwen332b | 32B | Reasoning, quality |
+| phi4-reasoning | nvidia/Phi-4-reasoning-plus-NVFP4 | 8004 | phi4 | ~14B | Math, logic |
+| llama33-70b | nvidia/Llama-3.3-70B-Instruct-NVFP4 | 8005 | llama3370b | 70B | General purpose |
+| deepseek-v32 | nvidia/DeepSeek-V3.2-NVFP4 | 8006 | deepseek | ~37B | Coding |
+| nemotron-120b | nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 | 8007 | nemotron120b | 12B | Highest quality |
+| kimi-k25 | moonshotai/Kimi-K2.5 | 8008 | kimi | MoE | (pending TRT-LLM 1.3.x) |
+
+## File Structure
+
+```
+CodingDGX/
+├── README.md
+├── docker-compose.yml           # 7 model services via Docker Compose profiles
+├── .env.example                 # HF_TOKEN template
+├── config/
+│   ├── trtllm-config.yml        # KV cache, GPU memory fraction, CUDA graphs
+│   └── start_trtllm.sh          # Container startup: HF download + trtllm-serve
+├── docs/
+│   ├── MODEL_GUIDE.md           # Model comparison, benchmarks, selection guide
+│   ├── REMOTE_ACCESS.md         # Networking, firewall, SSH tunnel, static IP
+│   ├── TROUBLESHOOTING.md       # Comprehensive issue resolution
+│   ├── ADDING_MODELS.md         # How to add new models to docker-compose
+│   ├── MODEL_SWITCHING.md       # Switch between models
+│   └── PERFORMANCE_MONITORING.md
+├── utils/
+│   ├── check_status.sh          # Health check: container → port → API
+│   ├── test_connection.py       # Remote connectivity + Claude Code setup test
+│   ├── switch_model.sh          # Stop all, start one model by name
+│   ├── test_models.sh           # Test all models sequentially with memory watchdog
+│   ├── monitor_metrics.py       # Real-time Prometheus metrics dashboard
+│   └── test_performance.py      # One-shot TTFT + tok/s measurement
+└── projects/                    # AI applications built on DGX models
+    └── voice-home-assistant/    # (planned) Voice → Home Assistant control
+```
 
 ## Critical Constraints
 
 ### 1. Architecture is ARM64
 - DGX Spark uses Grace CPU (ARM Cortex-X925/A725)
 - **Never** use x86_64 Docker images
-- **Always** use `vllm/vllm-openai:cu130-nightly` or ARM64-compatible images
+- **Always** use `nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6` or ARM64-compatible images
 
-### 2. Required vLLM Flags
-```bash
---reasoning-parser qwen3         # Enable reasoning mode
---tool-call-parser qwen3_coder   # Enable tool calling
---enable-auto-tool-choice        # Auto tool selection
---enable-prefix-caching          # Performance optimization
-```
+### 2. Runtime is TensorRT-LLM (NOT vLLM)
+- Image: `nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6`
+- Startup: `bash /start_trtllm.sh` inside container
+- Config: `/tmp/extra-llm-api-config.yml` (mapped from `config/trtllm-config.yml`)
+- Models must be NVFP4 variants from NVIDIA NGC/HuggingFace
 
 ### 3. Memory Management
-- Total: 128GB unified (CPU + GPU shared)
-- 35B model: ~90GB used with vLLM (efficient)
-- 122B model: ~120GB (experimental)
-- Use `--gpu-memory-utilization 0.80` for stability
+- Total: 128GB unified (CPU + GPU shared), ~119GB usable
+- `free_gpu_memory_fraction: 0.70` in trtllm-config.yml
+- Safety watchdog in test_models.sh: warn at 15GB free, kill at 8GB free
+- Only run one model at a time in production (profiles enforce this)
 
-### 4. Performance Expectations
-- 35B-A3B: 30-50 tok/s (depends on context length)
+### 4. Performance Expectations (NVFP4 on Blackwell)
+- Phi-4: ~100-120 tok/s
+- Qwen3-A3B: ~70-80 tok/s (default choice for speed)
+- Qwen3-32B: ~50-60 tok/s
+- Llama-3.3-70B: ~35-45 tok/s
+- DeepSeek-V3.2: ~30-40 tok/s
 - First run: ~15 minutes (model download + CUDA graph compilation)
-- Subsequent runs: 1-2 minutes
-- Memory bandwidth limited: ~273 GB/s LPDDR5X
 
-## File Structure
+## Docker Compose Usage
 
+```bash
+# Start a model
+docker compose --profile qwen3a3b up -d
+
+# Switch models
+./utils/switch_model.sh 35b       # Qwen3-A3B (fastest)
+./utils/switch_model.sh deepseek  # DeepSeek (best coding)
+./utils/switch_model.sh 32b       # Qwen3-32B (best reasoning)
+
+# Check health
+./utils/check_status.sh
 ```
-CodingDGX/
-├── README.md                    # Quickstart guide
-├── docker-compose.yml           # Service definitions
-├── .env.example                 # HF token template
-├── .gitignore
-├── docs/                        # Documentation
-│   ├── MODEL_GUIDE.md
-│   ├── REMOTE_ACCESS.md
-│   └── TROUBLESHOOTING.md
-└── utils/                       # Utility scripts
-    ├── check_status.sh
-    └── test_connection.py
+
+## Claude Code Integration
+
+```bash
+# On client machine
+export ANTHROPIC_BASE_URL=http://DGX_IP:8002   # Port matches model
+export ANTHROPIC_AUTH_TOKEN=dummy
+claude --model qwen3-30b-a3b
 ```
 
 ## Code Style
 
-### Docker Compose
-- Use `vllm/vllm-openai:cu130-nightly` image
-- Model name as first argument in command
+### Docker Compose Services
+- Use `nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6` image
+- Each model gets its own Docker Compose profile
 - Set `shm_size: '64gb'` and `ipc: host`
 - Bind to `0.0.0.0` for remote access
-- Port 8000 (vLLM default)
+- Unique port per model (8002–8008 range)
+- Volume mount: `config/start_trtllm.sh:/start_trtllm.sh` and `config/trtllm-config.yml:/tmp/extra-llm-api-config.yml`
 
 ### Documentation
-- Keep docs concise and practical
-- Include code examples
-- Reference actual performance numbers
-- Link to official resources
+- Keep concise and practical
+- Include actual performance numbers
+- Reference specific ports and profiles
 
 ### Scripts
-- Bash for server-side utilities
-- Python for client-side tools
-- Include error handling
-- Provide clear output
+- Bash for server-side utilities (ARM64 compatible)
+- Python for client-side tools (no venv needed on client if simple deps)
+- Include error handling and clear output
 
 ## What NOT to Do
 
-1. **Don't** create custom Dockerfiles - use official vLLM image
-2. **Don't** use SGLang - vLLM has better Qwen3.5 support
+1. **Don't** use vLLM — project has migrated to TensorRT-LLM
+2. **Don't** use SGLang
 3. **Don't** use x86 CUDA images
-4. **Don't** create unnecessary abstraction layers
-5. **Don't** add Python virtual environment setup - Docker handles it
-6. **Don't** over-engineer - keep it simple
+4. **Don't** create custom Dockerfiles — use official TRT-LLM image
+5. **Don't** run multiple large models simultaneously (OOM risk)
+6. **Don't** over-engineer — keep configurations simple
 
 ## What TO Do
 
-1. **Do** use `vllm/vllm-openai:cu130-nightly` image
-2. **Do** include all required vLLM flags
-3. **Do** test on actual DGX Spark hardware
-4. **Do** document first-run time (~15 minutes)
-5. **Do** keep configuration simple and clear
-6. **Do** provide troubleshooting guidance
+1. **Do** use `nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc6`
+2. **Do** use NVFP4 model variants for best Blackwell performance
+3. **Do** use Docker Compose profiles for model isolation
+4. **Do** test on actual DGX Spark hardware
+5. **Do** update performance numbers from real measurements
+6. **Do** provide troubleshooting guidance in docs/
 
-## Dependencies
+## Projects Directory
 
-### Required
-- Docker with NVIDIA Container Toolkit
-- HuggingFace token (for model downloads)
-- Network access to HuggingFace
+The `projects/` folder contains self-contained AI applications built on top of the DGX model infrastructure.
 
-### Not Required
-- Python virtual environments (Docker handles it)
-- Manual package installation
-- Custom CUDA setup
+### Project Conventions
+- Each project is its own subdirectory: `projects/<project-name>/`
+- Include a README.md with setup, architecture, and usage
+- Projects may run on the DGX or on a client machine calling DGX APIs
+- Keep project dependencies isolated (Docker or venv per project)
+- Document which DGX model(s) the project uses and why
 
-## Testing
+### Planned: voice-home-assistant
+Goal: Say a voice command → LLM interprets it → controls Home Assistant via MCP.
 
-### Server-Side
-```bash
-./utils/check_status.sh
-curl http://localhost:8000/v1/models
+Architecture:
+```
+Microphone → STT (Whisper) → LLM (Qwen3-A3B on DGX) + HA MCP → Home Assistant API
 ```
 
-### Client-Side
-```bash
-python utils/test_connection.py YOUR_DGX_IP
-```
+Components:
+- **STT**: faster-whisper (runs locally or on DGX) for low-latency transcription
+- **LLM**: Qwen3-A3B (port 8002) — fast enough for real-time voice response
+- **MCP**: Home Assistant MCP server (`npx @modelcontextprotocol/server-home-assistant`)
+- **Orchestrator**: Python script that ties STT → LLM → HA together
+
+Key considerations:
+- HA_TOKEN and HA_URL needed for Home Assistant MCP
+- Qwen3-A3B preferred for speed (70-80 tok/s) over quality models
+- Whisper `base` or `small` model for fast STT; `medium` for accuracy
+- MCP tool calling requires `--tool-call-parser` support (verify TRT-LLM support)
 
 ## Common Issues
 
-1. **Container crashes**: Check logs with `docker logs qwen35-35b`
-2. **Slow startup**: First run takes ~15 minutes (model download + CUDA compilation)
-3. **Out of memory**: Reduce `--gpu-memory-utilization` to 0.75 or 0.70
-4. **Model type not recognized**: Ensure using `vllm/vllm-openai:cu130-nightly` (has vLLM v0.16.0+)
+1. **Container won't start**: Check `docker logs <service>` and verify HF_TOKEN in `.env`
+2. **Slow first startup**: ~15 min for model download + CUDA graph compilation (normal)
+3. **Out of memory**: Only one model at a time; reduce `free_gpu_memory_fraction` to 0.65
+4. **Model not found**: Ensure NVFP4 variant exists on HuggingFace for that model
+5. **Kimi not working**: Requires TRT-LLM 1.3.x (not yet released as of 2026-03-14)
 
 ## Version Information
 
-- **vLLM**: v0.16.0+ (in `:cu130-nightly` tag)
-- **Qwen3.5**: Latest (Feb/Mar 2026 releases)
-- **CUDA**: 13.1 (in vLLM nightly image)
-- **PyTorch**: 2.9+ (in vLLM nightly image)
+- **TensorRT-LLM**: 1.2.0rc6
+- **CUDA**: 12.x (in TRT-LLM image)
+- **Models**: Qwen3, Phi-4, Llama-3.3, DeepSeek-V3.2, Nemotron (all Feb/Mar 2026 NVFP4)
 
 ## External Resources
 
-- [vLLM Documentation](https://docs.vllm.ai/)
-- [Qwen3.5 GitHub](https://github.com/QwenLM/Qwen3.5)
-- [Community Guide](https://github.com/adadrag/qwen3.5-dgx-spark)
-- [vLLM Docker Hub](https://hub.docker.com/r/vllm/vllm-openai)
+- [TensorRT-LLM Docs](https://nvidia.github.io/TensorRT-LLM/)
+- [NVIDIA NGC - TRT-LLM Image](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release)
+- [Qwen3 GitHub](https://github.com/QwenLM/Qwen3)
+- [Home Assistant MCP](https://github.com/modelcontextprotocol/servers/tree/main/src/home-assistant)
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 
 ## When Making Changes
 
 1. Test on actual DGX Spark hardware
-2. Verify ARM64 compatibility
-3. Check memory usage with `nvidia-smi`
-4. Measure actual performance (tok/s)
-5. Update documentation if behavior changes
-6. Keep it simple - avoid over-engineering
+2. Verify ARM64 compatibility before adding any image or binary
+3. Check memory usage with `nvidia-smi` after startup
+4. Measure actual tok/s and update docs if changed
+5. Keep project structure simple — one directory per concern

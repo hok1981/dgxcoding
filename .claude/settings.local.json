@@ -14,7 +14,11 @@
       "WebFetch(domain:catalog.ngc.nvidia.com)",
       "WebFetch(domain:docs.nvidia.com)",
       "WebFetch(domain:nvidia.github.io)",
-      "WebFetch(domain:developer.nvidia.com)"
+      "WebFetch(domain:developer.nvidia.com)",
+      "WebFetch(domain:makerworld.com)",
+      "WebFetch(domain:www.printables.com)",
+      "WebFetch(domain:cults3d.com)",
+      "WebFetch(domain:www.seeedstudio.com)"
     ]
   }
 }
