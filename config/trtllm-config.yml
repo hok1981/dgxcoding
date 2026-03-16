@@ -1,4 +1,8 @@
 print_iter_log: false
+# Maximum tokens per request (prompt + output combined).
+# Default is 8192; 32768 supports large HA context prompts while staying well within
+# Nemotron-Nano's 128K native context. Safe on Blackwell with 0.30 KV fraction.
+max_num_tokens: 32768
 kv_cache_config:
   dtype: "auto"
   # DGX Spark: ~116 GiB free at startup (unified memory, all visible to GPU).

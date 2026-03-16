@@ -25,10 +25,18 @@ from ha_client import HAClient, HA_TOOLS
 load_dotenv()
 
 
+# Only include domains that can be controlled — skip sensors, trackers, weather, etc.
+CONTROLLABLE_DOMAINS = {
+    "light", "switch", "climate", "cover", "fan", "media_player",
+    "script", "scene", "input_boolean", "input_select", "input_number",
+    "button", "lock", "vacuum", "alarm_control_panel",
+}
+
+
 def fetch_ha_context(ha: HAClient) -> str:
     """
-    Fetch all entities from HA and return a compact context string
-    grouped by domain, sorted alphabetically.
+    Fetch controllable entities from HA and return a compact context string.
+    Skips sensors, automations, device trackers, etc. to stay within token limits.
     """
     print("Fetching HA entities...", end=" ", flush=True)
     try:
@@ -37,17 +45,22 @@ def fetch_ha_context(ha: HAClient) -> str:
         print(f"\nERROR: Could not reach Home Assistant: {e}")
         sys.exit(1)
 
-    # Group by domain
+    total_raw = len(states)
+
+    # Group by domain, controllable only
     by_domain: dict[str, list[str]] = {}
     for s in states:
         eid = s["entity_id"]
         domain = eid.split(".")[0]
+        if domain not in CONTROLLABLE_DOMAINS:
+            continue
         name = s["attributes"].get("friendly_name", eid)
         state = s["state"]
         by_domain.setdefault(domain, []).append(f"  {eid} ({name}): {state}")
 
-    # Domains useful for control — put these first
-    priority = ["light", "switch", "climate", "cover", "fan", "media_player", "script", "automation", "scene", "input_boolean"]
+    # Priority order for the prompt
+    priority = ["light", "switch", "climate", "cover", "fan", "media_player",
+                "lock", "scene", "script", "input_boolean"]
     ordered = [(d, by_domain[d]) for d in priority if d in by_domain]
     ordered += [(d, by_domain[d]) for d in sorted(by_domain) if d not in priority]
 
@@ -59,7 +72,7 @@ def fetch_ha_context(ha: HAClient) -> str:
             lines.append(e)
         total += len(entities)
 
-    print(f"got {total} entities across {len(by_domain)} domains.")
+    print(f"got {total} controllable entities (filtered from {total_raw}) across {len(by_domain)} domains.")
     return "\n".join(lines)
 
 
