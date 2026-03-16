@@ -297,27 +297,23 @@ services:
     profiles:
       - kimi
 
-  # ── Vision-Language: Qwen2.5-VL-7B-Instruct-NVFP4 ──────────────────────────
-  # Multimodal (text + image + video). Port 8011.
-  # Memory: ~15 GiB total (LLM weights + vision encoder in FP16).
-  # Compatible with the voice assistant stack (Nemotron-Nano + Parakeet + Piper).
-  # First run: ~20-30 min (vision encoder download + CUDA graph compilation).
+  # ── Vision-Language: Qwen2.5-VL-7B-Instruct (vLLM backend) ─────────────────
+  # TRT-LLM 1.3.0rc7 has a bug: multimodal input routing not implemented for
+  # Qwen2.5-VL (Unknown modality: image). Using vLLM which has full support.
+  # Uses standard HF model (BF16, ~14 GiB) — vLLM doesn't use NVFP4 format.
+  # Port 8011. First run: ~10-15 min (model download, no CUDA graph compilation).
   qwen25-vl:
-    image: nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc7
+    image: vllm/vllm-openai:latest
     container_name: qwen25-vl
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
-      - HF_TOKEN=${HF_TOKEN}
-      - MODEL_HANDLE=nvidia/Qwen2.5-VL-7B-Instruct-NVFP4
-      - MAX_BATCH_SIZE=4
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
     ports:
       - "0.0.0.0:8011:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
-      - ./config/trtllm-config-vl.yml:/tmp/extra-llm-api-config.yml
-      - ./config/start_trtllm.sh:/start_trtllm.sh
-    shm_size: '64gb'
+    shm_size: '16gb'
     ipc: host
     ulimits:
       memlock: -1
@@ -329,7 +325,13 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command: bash /start_trtllm.sh
+    command: >
+      --model Qwen/Qwen2.5-VL-7B-Instruct
+      --trust-remote-code
+      --gpu-memory-utilization 0.25
+      --max-model-len 32768
+      --limit-mm-per-prompt image=1
+      --port 8000
     restart: unless-stopped
     profiles:
       - qwen25vl

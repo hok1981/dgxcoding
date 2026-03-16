@@ -56,6 +56,12 @@ class HAClient:
         """Get the current state of an entity."""
         return self._get(f"states/{entity_id}")
 
+    def get_camera_snapshot(self, entity_id: str) -> bytes:
+        """Fetch a JPEG snapshot from a camera entity."""
+        r = requests.get(f"{self.url}/api/camera_proxy/{entity_id}", headers=self.headers)
+        r.raise_for_status()
+        return r.content
+
     def list_entities(self, domain: str = None) -> list[dict]:
         """List all entities, optionally filtered by domain (e.g. 'light', 'switch')."""
         states = self._get("states")
@@ -197,6 +203,32 @@ HA_TOOLS = [
                 "properties": {
                     "domain": {"type": "string", "description": "Optional: light, switch, climate, script, etc."}
                 },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_camera_snapshot",
+            "description": (
+                "Capture a live image from a camera and analyze it with a vision model. "
+                "Use this when the user asks what is visible in a camera feed — "
+                "e.g. 'is there a car in the driveway?', 'is the garage door open?', "
+                "'is anyone at the front door?'. Returns a description of what is visible."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "entity_id": {
+                        "type": "string",
+                        "description": "Camera entity ID, e.g. camera.driveway, camera.garage, camera.front_door",
+                    },
+                    "question": {
+                        "type": "string",
+                        "description": "Specific question to answer about the image, e.g. 'Is there a car in the driveway?'",
+                    },
+                },
+                "required": ["entity_id", "question"],
             },
         },
     },
