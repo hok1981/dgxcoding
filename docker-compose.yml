@@ -326,11 +326,10 @@ services:
               count: all
               capabilities: [gpu]
     command: >
-      --model Qwen/Qwen2.5-VL-7B-Instruct
+      Qwen/Qwen2.5-VL-7B-Instruct
       --trust-remote-code
       --gpu-memory-utilization 0.25
       --max-model-len 32768
-      --limit-mm-per-prompt image=1
       --port 8000
     restart: unless-stopped
     profiles:
