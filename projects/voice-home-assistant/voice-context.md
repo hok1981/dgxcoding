@@ -37,7 +37,7 @@ Single-family home with the following areas. All entity IDs follow the pattern `
 | Front door contact | `binary_sensor.front_door_contact` | Open/closed |
 | Doorbell motion | `binary_sensor.front_door_motion` | |
 | Doorbell person | `binary_sensor.front_door_person` | AI detection |
-| Doorbell camera | `camera.front_door` | Reolink doorbell |
+| Doorbell camera | `camera.front_door_fluent` | Reolink doorbell |
 | Front porch outlet | `switch.front_porch_outlet` | Outdoor plug |
 | Gym ceiling fan | `fan.ceiling_gym_fan` | Bond Bridge (gym area) |
 
@@ -56,7 +56,7 @@ Single-family home with the following areas. All entity IDs follow the pattern `
 | Garage door | `cover.garage_door` | ratgdo (open/close/stop) |
 | Remote lock | `lock.garage_remote_lock` | Disables remotes |
 | Motion sensor | `binary_sensor.garage_motion` | |
-| Interior camera | `camera.garage` | Reolink E1 Pro PTZ |
+| Interior camera | `camera.garage_fluent` | Reolink E1 Pro PTZ |
 | Driveway camera | `camera.driveway` | Reolink Elite floodlight |
 | Driveway floodlight | `light.driveway_floodlight` | |
 | Temperature | `sensor.garage_temperature` | |
@@ -103,7 +103,7 @@ Single-family home with the following areas. All entity IDs follow the pattern `
 |---|---|---|
 | Patio speaker | `media_player.patio_speaker` | Linkplay (native) |
 | Patio speaker (MA) | `media_player.patio_speaker_ma` | Music Assistant |
-| Back yard camera | `camera.back_yard` | Reolink E560 PTZ floodlight |
+| Back yard camera | `camera.back_yard_fluent` | Reolink E560 PTZ floodlight |
 
 ### Pool
 | What | Entity ID | Notes |
@@ -133,7 +133,7 @@ Single-family home with the following areas. All entity IDs follow the pattern `
 ### Attic
 | What | Entity ID | Notes |
 |---|---|---|
-| Camera | `camera.attic` | Reolink E1 Pro PTZ |
+| Camera | `camera.attic_fluent` | Reolink E1 Pro PTZ |
 | Temperature | `sensor.attic_temperature` | |
 | Humidity | `sensor.attic_humidity` | |
 

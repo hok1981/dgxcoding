@@ -72,8 +72,9 @@ def fetch_live_states(ha: HAClient, entity_ids: list[str]) -> str:
         if eid not in state_map:
             continue
         domain = eid.split(".")[0]
-        if domain in ("sensor", "binary_sensor", "camera", "calendar"):
+        if domain in ("sensor", "binary_sensor", "calendar"):
             continue
+        # Include cameras with their availability state so the model can skip unavailable ones
         by_domain.setdefault(domain, []).append(f"  {eid}: {state_map[eid]}")
 
     lines = []
@@ -92,8 +93,14 @@ def fetch_live_states(ha: HAClient, entity_ids: list[str]) -> str:
 
 def build_system_prompt(home_doc: str, live_states: str, has_vision: bool) -> str:
     vision_rule = (
-        "- For questions about camera images (e.g. 'is there a car?', 'is anyone at the door?'), "
-        "use the get_camera_snapshot tool — a vision model will analyze the image and return a description."
+        "- For questions about camera images (e.g. 'is there a car?', 'is anyone at the door?', "
+        "'what do you see on camera X?'), use the get_camera_snapshot tool.\n"
+        "- Only call get_camera_snapshot for cameras whose state is 'streaming' or 'idle'. "
+        "Skip cameras that are 'unavailable'.\n"
+        "- Never call get_camera_snapshot for the same entity_id more than once per response.\n"
+        "- For the `question` parameter, ask something specific and relevant to that camera's location "
+        "(e.g. for camera.driveway ask about cars/people, for camera.attic ask about leaks/animals). "
+        "For general surveys use 'Describe what you see.'"
     ) if has_vision else (
         "- Camera image analysis is not available (no vision model configured)."
     )
@@ -245,8 +252,9 @@ def run_query(
     ha_readonly  — HA client for read-only ops like camera snapshots (always provided)
     Camera snapshot calls are routed to the vision model.
     """
-    dry_run     = ha is None
-    ha_for_cam  = ha_readonly or ha  # camera is always read-only, use whichever is available
+    dry_run       = ha is None
+    ha_for_cam    = ha_readonly or ha  # camera is always read-only, use whichever is available
+    snapped_cams  = set()             # dedup: never snapshot same camera twice in one query
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user",   "content": user_text},
@@ -277,7 +285,12 @@ def run_query(
                 actions.append({"tool": call.function.name, "args": args})
 
                 if call.function.name == "get_camera_snapshot":
-                    result = handle_camera_tool(ha_for_cam, vision_llm, vision_model, args, dry_run, debug)
+                    cam_id = args.get("entity_id", "")
+                    if cam_id in snapped_cams:
+                        result = f"[already analyzed {cam_id} this query — skipping duplicate]"
+                    else:
+                        snapped_cams.add(cam_id)
+                        result = handle_camera_tool(ha_for_cam, vision_llm, vision_model, args, dry_run, debug)
                 elif dry_run:
                     result = "[DRY RUN — not executed]"
                 else:
@@ -295,7 +308,12 @@ def run_query(
             for i, c in enumerate(xml_calls):
                 actions.append(c)
                 if c["tool"] == "get_camera_snapshot":
-                    result = handle_camera_tool(ha_for_cam, vision_llm, vision_model, c["args"], dry_run, debug)
+                    cam_id = c["args"].get("entity_id", "")
+                    if cam_id in snapped_cams:
+                        result = f"[already analyzed {cam_id} this query — skipping duplicate]"
+                    else:
+                        snapped_cams.add(cam_id)
+                        result = handle_camera_tool(ha_for_cam, vision_llm, vision_model, c["args"], dry_run, debug)
                 elif dry_run:
                     result = "[DRY RUN — not executed]"
                 else:

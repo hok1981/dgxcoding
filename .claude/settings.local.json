@@ -39,6 +39,9 @@
       "WebFetch(domain:cookbook.openai.com)",
       "WebFetch(domain:thepihut.com)",
       "Read(//d/git/homeassist/docs/**)"
+    ],
+    "additionalDirectories": [
+      "D:\\git\\homeassist\\docs"
     ]
   }
 }
