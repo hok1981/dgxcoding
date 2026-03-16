@@ -20,12 +20,15 @@ echo -e "${YELLOW}Stopping all running containers...${NC}"
 docker compose down
 echo ""
 
+VISION=${VISION:-0}
+
 echo -e "${YELLOW}Starting voice assistant stack...${NC}"
-docker compose \
-  --profile nemotronnano \
-  --profile parakeet \
-  --profile piper \
-  up -d
+PROFILES="--profile nemotronnano --profile parakeet --profile piper"
+if [ "$VISION" = "1" ]; then
+  PROFILES="$PROFILES --profile qwen25vl"
+fi
+
+docker compose $PROFILES up -d
 
 echo ""
 echo -e "${GREEN}✓ Stack started${NC}"
@@ -34,6 +37,9 @@ echo "Services:"
 echo "  LLM (Nemotron-Nano)  →  http://localhost:8009/v1"
 echo "  STT (Parakeet CTC)   →  http://localhost:9000  (gRPC: 50051)"
 echo "  TTS (Wyoming Piper)  →  tcp://localhost:10200"
+if [ "$VISION" = "1" ]; then
+  echo "  VLM (Qwen2.5-VL-7B) →  http://localhost:8011/v1"
+fi
 echo ""
 echo "Nemotron-Nano takes ~5-15 min to load (CUDA graph compilation)."
 echo "Watch startup:"

@@ -1,0 +1,13 @@
+print_iter_log: false
+# Vision-language models need larger max_num_tokens:
+# a single high-res image can encode to 1000-2000 tokens before the text prompt.
+# 65536 comfortably handles image + context + output in one request.
+max_num_tokens: 65536
+kv_cache_config:
+  dtype: "auto"
+  # Qwen2.5-VL-7B is small (~15 GiB total incl. vision encoder).
+  # 0.25 KV fraction keeps memory pressure low when co-running with
+  # Nemotron-Nano + Parakeet in the voice assistant stack.
+  free_gpu_memory_fraction: 0.25
+cuda_graph_config:
+  enable_padding: true

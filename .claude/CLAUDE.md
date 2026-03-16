@@ -25,6 +25,7 @@ This project runs multiple LLMs on NVIDIA DGX Spark (Grace Blackwell ARM64) usin
 | kimi-k25 | moonshotai/Kimi-K2.5 | 8008 | kimi | MoE | (pending TRT-LLM 1.3.x) |
 | nemotron-nano | nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4 | 8009 | nemotronnano | 3B | Fast MoE, agentic |
 | qwen35-35b | Qwen/Qwen3.5-35B-A3B-FP8 | 8010 | qwen3535b | 3B | Coding, fast MoE |
+| qwen25-vl | nvidia/Qwen2.5-VL-7B-Instruct-NVFP4 | 8011 | qwen25vl | 7B | Vision+text, camera analysis |
 
 ## File Structure
 
