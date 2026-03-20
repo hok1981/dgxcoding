@@ -386,34 +386,23 @@ services:
     profiles:
       - piper
 
-  # ── Speech-to-Text: Wyoming Faster-Whisper ──────────────────────────────────
+  # ── Speech-to-Text: Wyoming Whisper (CPU) ───────────────────────────────────
   # Wyoming protocol on :10300 for Home Assistant Assist Pipeline.
-  # Downloads model on first start (~145MB for base). CUDA-accelerated.
+  # Official rhasspy image — CPU only (GPU not supported upstream).
+  # base model ~145MB, downloads on first start. Fast enough for voice latency.
   # Start: docker compose --profile whisper up -d
   wyoming-whisper:
-    image: ghcr.io/rhasspy/wyoming-faster-whisper:latest
+    image: rhasspy/wyoming-whisper:latest
     container_name: wyoming-whisper
-    runtime: nvidia
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
     ports:
       - "0.0.0.0:10300:10300"
     volumes:
       - ~/.local/share/wyoming-whisper:/data
     command: >
-      --uri tcp://0.0.0.0:10300
       --model base
       --language en
-      --device cuda
       --data-dir /data
       --download-dir /data
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     restart: unless-stopped
     profiles:
       - whisper
