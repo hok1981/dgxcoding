@@ -391,7 +391,7 @@ services:
   # Downloads model on first start (~145MB for base). CUDA-accelerated.
   # Start: docker compose --profile whisper up -d
   wyoming-whisper:
-    image: rhasspy/wyoming-faster-whisper:latest
+    image: ghcr.io/rhasspy/wyoming-faster-whisper:latest
     container_name: wyoming-whisper
     runtime: nvidia
     environment:
